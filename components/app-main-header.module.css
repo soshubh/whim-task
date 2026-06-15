@@ -1,0 +1,42 @@
+.copy {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--ui-scale));
+}
+
+.sectionLabel {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+}
+
+.greeting {
+  color: var(--foreground);
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+}
+
+.subtitle {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-normal);
+}
+
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: calc(320px * var(--ui-scale));
+  height: calc(56px * var(--ui-scale));
+  border: 1px solid var(--border);
+  border-radius: calc(999px * var(--ui-scale));
+  background: var(--card);
+  color: var(--muted-foreground);
+  padding: 0 var(--space-4);
+}
+
+.search span {
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+}
