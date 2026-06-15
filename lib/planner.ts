@@ -80,21 +80,10 @@ export function createEmptyDayState(): PlannerDayState {
 
 export function createInitialPlannerState(referenceDate = new Date()) {
   const today = stripTime(referenceDate)
-  const todayKey = toDateKey(today)
 
   return {
     [toDateKey(addDays(today, -1))]: createEmptyDayState(),
-    [todayKey]: {
-      tasks: [
-        createTask("Review design feedback", "manual"),
-        createTask("Ship planner interaction polish", "manual"),
-        createTask("Follow up on invoices", "manual"),
-      ],
-      completed: [createTask("Standup and inbox reset", "manual")],
-      draft: "",
-      isAdding: false,
-      showCompleted: false,
-    },
+    [toDateKey(today)]: createEmptyDayState(),
     [toDateKey(addDays(today, 1))]: createEmptyDayState(),
   } satisfies Record<string, PlannerDayState>
 }

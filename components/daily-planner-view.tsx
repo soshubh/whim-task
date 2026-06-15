@@ -154,34 +154,6 @@ const MONTH_DATE_OPTIONS = Array.from({ length: 31 }, (_, index) => index + 1)
 const today = new Date()
 const initialTodayKey = toDateKey(today)
 
-const initialPlannerState: Record<string, PlannerDayState> = {
-  [toDateKey(addDays(today, -1))]: {
-    tasks: [],
-    completed: [],
-    draft: "",
-    isAdding: false,
-    showCompleted: false,
-  },
-  [initialTodayKey]: {
-    tasks: [
-      createTask("Review design feedback", "manual"),
-      createTask("Ship planner interaction polish", "manual"),
-      createTask("Follow up on invoices", "manual"),
-    ],
-    completed: [createTask("Standup and inbox reset", "manual")],
-    draft: "",
-    isAdding: false,
-    showCompleted: false,
-  },
-  [toDateKey(addDays(today, 1))]: {
-    tasks: [],
-    completed: [],
-    draft: "",
-    isAdding: false,
-    showCompleted: false,
-  },
-}
-
 const plannerViews: Array<{
   icon: React.ComponentType<{ className?: string }>
   label: string
