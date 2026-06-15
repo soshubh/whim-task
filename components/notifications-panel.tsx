@@ -68,60 +68,53 @@ export function NotificationsPanel({
       title="Notifications"
       variant="notifications"
     >
-      {dueItems.length > 0 ? (
-        <section className="content-drawer__section">
-          <h3 className="content-drawer__section-title">Due now</h3>
-          <NotificationList
-            items={dueItems}
-            onDismiss={(reminderId) => {
-              setOpenMenuId(null)
-              onDismiss(reminderId)
-            }}
-            onReschedule={(reminderId) => {
-              setOpenMenuId(null)
-              onReschedule(reminderId)
-            }}
-            openMenuId={openMenuId}
-            setOpenMenuId={setOpenMenuId}
-            variant="due"
-          />
-        </section>
-      ) : null}
-
-      <section className="content-drawer__section">
-        <h3 className="content-drawer__section-title">Upcoming</h3>
-        {upcomingItems.length > 0 ? (
-          <NotificationList
-            items={upcomingItems}
-            onDismiss={(reminderId) => {
-              setOpenMenuId(null)
-              onDismiss(reminderId)
-            }}
-            onReschedule={(reminderId) => {
-              setOpenMenuId(null)
-              onReschedule(reminderId)
-            }}
-            openMenuId={openMenuId}
-            setOpenMenuId={setOpenMenuId}
-            variant="upcoming"
-          />
-        ) : (
-          <p className="content-drawer__empty">
-            No upcoming reminders yet. Use the task menu to set one.
-          </p>
-        )}
-      </section>
-
       {items.length === 0 ? (
-        <div className="content-drawer__examples">
-          <p className="content-drawer__examples-title">Examples</p>
-          <ul className="content-drawer__examples-list">
-            <li>Review design feedback · Today at 2:30 PM</li>
-            <li>Morning focus block · Every routine day at 8:15 AM</li>
-            <li>Plan tomorrow · Tomorrow at 6:00 PM</li>
-          </ul>
-        </div>
-      ) : null}
+        <p className="content-drawer__empty content-drawer__empty--centered">
+          There are no notifications
+        </p>
+      ) : (
+        <>
+          {dueItems.length > 0 ? (
+            <section className="content-drawer__section">
+              <h3 className="content-drawer__section-title">Due now</h3>
+              <NotificationList
+                items={dueItems}
+                onDismiss={(reminderId) => {
+                  setOpenMenuId(null)
+                  onDismiss(reminderId)
+                }}
+                onReschedule={(reminderId) => {
+                  setOpenMenuId(null)
+                  onReschedule(reminderId)
+                }}
+                openMenuId={openMenuId}
+                setOpenMenuId={setOpenMenuId}
+                variant="due"
+              />
+            </section>
+          ) : null}
+
+          {upcomingItems.length > 0 ? (
+            <section className="content-drawer__section">
+              <h3 className="content-drawer__section-title">Upcoming</h3>
+              <NotificationList
+                items={upcomingItems}
+                onDismiss={(reminderId) => {
+                  setOpenMenuId(null)
+                  onDismiss(reminderId)
+                }}
+                onReschedule={(reminderId) => {
+                  setOpenMenuId(null)
+                  onReschedule(reminderId)
+                }}
+                openMenuId={openMenuId}
+                setOpenMenuId={setOpenMenuId}
+                variant="upcoming"
+              />
+            </section>
+          ) : null}
+        </>
+      )}
     </ContentDrawer>
   )
 }

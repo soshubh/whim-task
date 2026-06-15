@@ -39,11 +39,16 @@ export function SettingsPanel({ onClose, open }: SettingsPanelProps) {
   } = useSettings()
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const pendingAvatarFileRef = React.useRef<File | null>(null)
   const [draft, setDraft] = React.useState<AppSettings>(settings)
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [saveError, setSaveError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     if (open) {
       setDraft(settings)
+      pendingAvatarFileRef.current = null
+      setSaveError(null)
     }
   }, [open, settings])
 
@@ -101,6 +106,15 @@ export function SettingsPanel({ onClose, open }: SettingsPanelProps) {
       return
     }
 
+    if (file.size > 5 * 1024 * 1024) {
+      setSaveError("Profile picture must be 5 MB or smaller.")
+      event.target.value = ""
+      return
+    }
+
+    pendingAvatarFileRef.current = file
+    setSaveError(null)
+
     const reader = new FileReader()
     reader.onload = () => {
       if (typeof reader.result === "string") {
@@ -121,38 +135,62 @@ export function SettingsPanel({ onClose, open }: SettingsPanelProps) {
   const showPermissionSection = browserPermission !== "granted"
 
   const handleSave = async () => {
-    let nextDraft = draft
+    setSaveError(null)
+    setIsSaving(true)
 
-    if (
-      draft.notifications.browserNotificationsEnabled &&
-      browserPermission !== "granted"
-    ) {
-      const permission = await requestBrowserPermission()
+    try {
+      let nextDraft = draft
 
-      if (permission !== "granted") {
-        nextDraft = {
-          ...draft,
-          notifications: {
-            ...draft.notifications,
-            browserNotificationsEnabled: false,
-          },
+      if (
+        draft.notifications.browserNotificationsEnabled &&
+        browserPermission !== "granted"
+      ) {
+        const permission = await requestBrowserPermission()
+
+        if (permission !== "granted") {
+          nextDraft = {
+            ...draft,
+            notifications: {
+              ...draft.notifications,
+              browserNotificationsEnabled: false,
+            },
+          }
         }
       }
-    }
 
-    commitSettings(nextDraft)
+      await commitSettings(nextDraft, {
+        avatarFile: pendingAvatarFileRef.current,
+      })
+      pendingAvatarFileRef.current = null
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Could not save settings. Try again.",
+      )
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
     <ContentDrawer
       actionBar={
-        <button
-          className="content-drawer__save-button"
-          onClick={() => void handleSave()}
-          type="button"
-        >
-          Save changes
-        </button>
+        <>
+          {saveError ? (
+            <p className="content-drawer__settings-hint" role="alert">
+              {saveError}
+            </p>
+          ) : null}
+          <button
+            className="content-drawer__save-button"
+            disabled={isSaving}
+            onClick={() => void handleSave()}
+            type="button"
+          >
+            {isSaving ? "Saving..." : "Save changes"}
+          </button>
+        </>
       }
       ariaLabel="Settings"
       footer={

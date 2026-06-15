@@ -14,8 +14,10 @@ import {
   getTodayTaskSummary,
   markDailyUpdateFired,
 } from "@/lib/daily-updates"
+import { useAuth } from "@/components/auth-provider"
 import { usePlanner } from "@/components/planner-provider"
 import { AUTH_UPDATED_EVENT } from "@/lib/auth"
+import { saveRemoteProfile } from "@/lib/profile-sync"
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -24,10 +26,17 @@ import {
   type AppSettings,
 } from "@/lib/settings"
 
+type CommitSettingsOptions = {
+  avatarFile?: File | null
+}
+
 type SettingsContextValue = {
   browserPermission: ReturnType<typeof getBrowserNotificationPermission>
   closeSettings: () => void
-  commitSettings: (next: AppSettings) => void
+  commitSettings: (
+    next: AppSettings,
+    options?: CommitSettingsOptions,
+  ) => Promise<void>
   openSettings: () => void
   requestBrowserPermission: () => Promise<
     ReturnType<typeof getBrowserNotificationPermission>
@@ -39,6 +48,7 @@ type SettingsContextValue = {
 const SettingsContext = React.createContext<SettingsContextValue | null>(null)
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
+  const { session } = useAuth()
   const { plannerState, routines } = usePlanner()
   const [settings, setSettings] = React.useState<AppSettings>(DEFAULT_SETTINGS)
   const [settingsOpen, setSettingsOpen] = React.useState(false)
@@ -65,10 +75,34 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const commitSettings = React.useCallback((next: AppSettings) => {
-    setSettings(next)
-    saveSettings(next)
-  }, [])
+  const commitSettings = React.useCallback(
+    async (next: AppSettings, options?: CommitSettingsOptions) => {
+      let profile = next.profile
+
+      if (session?.userId) {
+        const savedProfile = await saveRemoteProfile(session.userId, {
+          name: next.profile.name,
+          avatar: next.profile.avatar,
+          avatarFile: options?.avatarFile,
+        })
+
+        profile = {
+          ...next.profile,
+          name: savedProfile.name,
+          avatar: savedProfile.avatarUrl,
+        }
+      }
+
+      const persisted: AppSettings = {
+        ...next,
+        profile,
+      }
+
+      setSettings(persisted)
+      saveSettings(persisted)
+    },
+    [session?.userId],
+  )
 
   const openSettings = React.useCallback(() => {
     setSettingsOpen(true)

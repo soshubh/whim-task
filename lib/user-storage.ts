@@ -137,11 +137,11 @@ export function writeScopedItem(baseKey: string, value: string) {
   }
 
   const userId = getActiveUserId()
-  if (!userId) {
-    return
-  }
+  const storageKey = userId
+    ? getScopedStorageKey(baseKey, userId)
+    : baseKey
 
-  window.localStorage.setItem(getScopedStorageKey(baseKey, userId), value)
+  window.localStorage.setItem(storageKey, value)
 }
 
 export function readScopedJson<T>(baseKey: string, fallback: T): T {

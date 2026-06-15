@@ -18,6 +18,7 @@ import {
   type AppSettings,
 } from "@/lib/settings"
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import { fetchRemoteProfile } from "@/lib/profile-sync"
 import {
   migrateLegacyStorageForUser,
   setActiveUserId,
@@ -48,21 +49,36 @@ function sessionFromUser(user: User): AuthSession {
   })
 }
 
-function syncProfileFromSession(session: AuthSession) {
+let profileSyncGeneration = 0
+
+async function syncProfileFromSession(session: AuthSession) {
+  const syncId = ++profileSyncGeneration
+
   setActiveUserId(session.userId)
   migrateLegacyStorageForUser(session.userId, session.email)
 
   const current = loadSettings()
+  const remote = await fetchRemoteProfile(session.userId)
+
+  if (syncId !== profileSyncGeneration) {
+    return
+  }
+
   const next: AppSettings = {
     ...current,
     profile: {
       ...current.profile,
       email: session.email,
-      name: session.name,
+      name: remote?.name ?? (current.profile.name || session.name),
+      avatar: remote?.avatarUrl ?? current.profile.avatar,
     },
   }
 
   saveSettings(next)
+}
+
+function shouldSyncProfileFromAuthEvent(event: string) {
+  return event === "SIGNED_IN" || event === "INITIAL_SESSION"
 }
 
 function clearAuthenticatedStorageScope() {
@@ -85,27 +101,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const supabase = getSupabaseClient()
 
-    const applySession = (nextSession: AuthSession | null) => {
-      if (nextSession) {
-        syncProfileFromSession(nextSession)
+    const applySignedOutSession = () => {
+      clearAuthenticatedStorageScope()
+      setSession(null)
+      window.dispatchEvent(new CustomEvent(AUTH_UPDATED_EVENT))
+      setIsLoading(false)
+    }
+
+    const applySignedInSession = async (
+      nextSession: AuthSession,
+      syncProfile: boolean,
+    ) => {
+      if (syncProfile) {
+        await syncProfileFromSession(nextSession)
       } else {
-        clearAuthenticatedStorageScope()
+        setActiveUserId(nextSession.userId)
       }
 
       setSession(nextSession)
       window.dispatchEvent(new CustomEvent(AUTH_UPDATED_EVENT))
+      setIsLoading(false)
     }
 
     supabase.auth.getSession().then(({ data: { session: authSession } }) => {
-      applySession(authSession?.user ? sessionFromUser(authSession.user) : null)
-      setIsLoading(false)
+      if (!authSession?.user) {
+        applySignedOutSession()
+        return
+      }
+
+      void applySignedInSession(sessionFromUser(authSession.user), true)
     })
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, authSession) => {
-      applySession(authSession?.user ? sessionFromUser(authSession.user) : null)
-      setIsLoading(false)
+    } = supabase.auth.onAuthStateChange((event, authSession) => {
+      if (!authSession?.user) {
+        applySignedOutSession()
+        return
+      }
+
+      void applySignedInSession(
+        sessionFromUser(authSession.user),
+        shouldSyncProfileFromAuthEvent(event),
+      )
     })
 
     return () => {
@@ -185,8 +223,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const nextSession = sessionFromUser(data.user)
+    await syncProfileFromSession(nextSession)
     setSession(nextSession)
-    syncProfileFromSession(nextSession)
     window.dispatchEvent(new CustomEvent(AUTH_UPDATED_EVENT))
 
     return nextSession
