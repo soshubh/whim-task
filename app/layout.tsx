@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={poppins.variable} suppressHydrationWarning>
-      <body className="app-body" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <AppProviders>
           <TooltipProvider>{children}</TooltipProvider>
         </AppProviders>

@@ -20,6 +20,7 @@ import {
   SettingsProvider,
   useSettings,
 } from "@/components/settings-provider"
+import { GET_STARTED_PATH } from "@/lib/app-meta"
 import { Button } from "@/components/ui/button"
 
 const sectionTitles: Record<ShellSection, string> = {
@@ -62,13 +63,13 @@ function AppShell() {
     closeNotifications()
     closeSettings()
     void signOut().then(() => {
-      router.replace("/login")
+      router.replace(GET_STARTED_PATH)
     })
   }, [closeNotifications, closeSettings, router, signOut])
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.replace("/login")
+      router.replace(GET_STARTED_PATH)
     }
   }, [isAuthenticated, isLoading, router])
 
@@ -152,12 +153,14 @@ function AppShell() {
 
 export default function Page() {
   return (
-    <PlannerProvider>
-      <SettingsProvider>
-        <ReminderUiProvider>
-          <AppShell />
-        </ReminderUiProvider>
-      </SettingsProvider>
-    </PlannerProvider>
+    <div className="app-body">
+      <PlannerProvider>
+        <SettingsProvider>
+          <ReminderUiProvider>
+            <AppShell />
+          </ReminderUiProvider>
+        </SettingsProvider>
+      </PlannerProvider>
+    </div>
   )
 }
