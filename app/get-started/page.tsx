@@ -19,7 +19,7 @@ const MAX_OTP_LENGTH = 8
 
 export default function GetStartedPage() {
   const router = useRouter()
-  const { isAuthenticated, isLoading, sendOtp, verifyOtp } = useAuth()
+  const { isAuthenticated, isLoading, configError, sendOtp, verifyOtp } = useAuth()
   const [step, setStep] = React.useState<AuthStep>("email")
   const [email, setEmail] = React.useState("")
   const [otp, setOtp] = React.useState("")
@@ -141,11 +141,15 @@ export default function GetStartedPage() {
                   </p>
                 ) : null}
 
+                {configError ? (
+                  <p className="auth-page__error">{configError}</p>
+                ) : null}
+
                 {error ? <p className="auth-page__error">{error}</p> : null}
 
                 <Button
                   className="auth-page__submit"
-                  disabled={!canSendCode}
+                  disabled={!canSendCode || Boolean(configError)}
                   type="submit"
                 >
                   {isSubmitting ? "Sending code..." : "Send one-time code"}
@@ -183,11 +187,15 @@ export default function GetStartedPage() {
                   />
                 </label>
 
+                {configError ? (
+                  <p className="auth-page__error">{configError}</p>
+                ) : null}
+
                 {error ? <p className="auth-page__error">{error}</p> : null}
 
                 <Button
                   className="auth-page__submit"
-                  disabled={isSubmitting || !isOtpComplete}
+                  disabled={isSubmitting || !isOtpComplete || Boolean(configError)}
                   type="submit"
                 >
                   {isSubmitting ? "Verifying..." : "Verify and continue"}

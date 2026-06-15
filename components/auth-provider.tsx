@@ -17,13 +17,14 @@ import {
   saveSettings,
   type AppSettings,
 } from "@/lib/settings"
-import { getSupabaseClient } from "@/lib/supabase/client"
+import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import {
   migrateLegacyStorageForUser,
   setActiveUserId,
 } from "@/lib/user-storage"
 
 type AuthContextValue = {
+  configError: string | null
   isAuthenticated: boolean
   isLoading: boolean
   sendOtp: (email: string) => Promise<{ email: string; name: string }>
@@ -71,8 +72,17 @@ function clearAuthenticatedStorageScope() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<AuthSession | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
+  const [configError, setConfigError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setConfigError(
+        "Supabase is not configured for this deployment. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.",
+      )
+      setIsLoading(false)
+      return
+    }
+
     const supabase = getSupabaseClient()
 
     const applySession = (nextSession: AuthSession | null) => {
@@ -104,6 +114,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const sendOtp = React.useCallback(async (email: string) => {
+    if (!isSupabaseConfigured()) {
+      throw new Error(
+        "Auth is unavailable. Supabase environment variables are missing on the server.",
+      )
+    }
+
     const normalizedEmail = normalizeEmail(email)
 
     if (!isValidEmail(normalizedEmail)) {
@@ -134,6 +150,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const verifyOtp = React.useCallback(async (email: string, otp: string) => {
+    if (!isSupabaseConfigured()) {
+      throw new Error(
+        "Auth is unavailable. Supabase environment variables are missing on the server.",
+      )
+    }
+
     const normalizedEmail = normalizeEmail(email)
     const token = otp.trim()
 
@@ -180,6 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = React.useMemo(
     () => ({
+      configError,
       isAuthenticated: Boolean(session),
       isLoading,
       sendOtp,
@@ -187,7 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       verifyOtp,
     }),
-    [isLoading, sendOtp, session, signOut, verifyOtp],
+    [configError, isLoading, sendOtp, session, signOut, verifyOtp],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

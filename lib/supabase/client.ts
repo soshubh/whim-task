@@ -9,20 +9,35 @@ function normalizeSupabaseUrl(url: string) {
     .replace(/\/+$/, "")
 }
 
-export function getSupabaseClient() {
+export function getSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!url || !anonKey) {
+    return null
+  }
+
+  return {
+    url: normalizeSupabaseUrl(url),
+    anonKey,
+  }
+}
+
+export function isSupabaseConfigured() {
+  return getSupabaseConfig() !== null
+}
+
+export function getSupabaseClient() {
+  const config = getSupabaseConfig()
+
+  if (!config) {
     throw new Error(
       "Missing Supabase env vars. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
     )
   }
 
-  const normalizedUrl = normalizeSupabaseUrl(url)
-
   if (!browserClient) {
-    browserClient = createClient(normalizedUrl, anonKey)
+    browserClient = createClient(config.url, config.anonKey)
   }
 
   return browserClient
