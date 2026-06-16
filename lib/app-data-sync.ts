@@ -352,7 +352,16 @@ export async function fetchRemoteSnapshot(
     fetchRemoteNotificationSettings(userId),
   ])
 
-  if (error || !data) {
+  if (error) {
+    console.error(
+      "[Whim Task sync] Could not read user_sync_snapshots:",
+      error.message,
+      "— Run supabase/setup-user-sync.sql in Supabase SQL Editor.",
+    )
+    return null
+  }
+
+  if (!data) {
     return null
   }
 
@@ -382,9 +391,16 @@ export async function pushRemoteSnapshot(
     updated_at: updatedAt,
   }
 
-  const { error } = await supabase.from("user_sync_snapshots").upsert(payload)
+  const { error } = await supabase
+    .from("user_sync_snapshots")
+    .upsert(payload, { onConflict: "user_id" })
 
   if (error) {
+    console.error(
+      "[Whim Task sync] Could not save tasks to Supabase:",
+      error.message,
+      "— Run supabase/setup-user-sync.sql in Supabase SQL Editor.",
+    )
     throw new Error(error.message || "Could not save app data to Supabase.")
   }
 

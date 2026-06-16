@@ -14,7 +14,34 @@
 | Cross-device sync | `user_sync_snapshots` |
 | Gmail OTP (Brevo) | `otp_codes` (service-role only) |
 
-## Apply the SQL
+## Cross-device task sync (required for phone + desktop)
+
+Tasks, routines, reminders, and settings sync through **`user_sync_snapshots`**.  
+Profile name/avatar uses **`profiles`** (separate — that is why name syncs but tasks may not).
+
+### Run this in Supabase → SQL Editor
+
+1. Ensure initial schema is applied first:
+   - `supabase/migrations/20250615000000_initial_schema.sql`
+2. Then run the sync setup (safe to re-run):
+   - **`supabase/setup-user-sync.sql`**
+
+### After running SQL
+
+1. Redeploy the app (Vercel) on **both** mobile and desktop URLs.
+2. Both deployments must use the **same** env vars:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. Sign in on **desktop** first → add a task → wait 1 second.
+4. Sign in on **mobile** with the same account → tasks should appear.
+
+### Check sync in Supabase
+
+Table Editor → **`user_sync_snapshots`** → your user row should contain JSON in `planner_state`.
+
+If the table is missing or empty, tasks will not sync between devices.
+
+### Apply the SQL
 
 1. Open [Supabase Dashboard](https://supabase.com/dashboard) → your project → **SQL Editor**
 2. Paste and run:
