@@ -568,6 +568,28 @@
   stroke: #eef0fb;
 }
 
+.home-dashboard__ring-stop-1 {
+  stop-color: #a5e7ff;
+}
+
+.home-dashboard__ring-stop-2 {
+  stop-color: #bfbbff;
+}
+
+.home-dashboard__ring-stop-3 {
+  stop-color: #ffb6d8;
+}
+
+.home-dashboard__ring-stop-4 {
+  stop-color: #ffd9c3;
+}
+
+.home-dashboard__ring-svg .home-dashboard__ring-progress {
+  stroke: url(#home-dashboard-ring-progress-gradient);
+  filter: blur(calc(8px * var(--ui-scale)));
+  -webkit-filter: blur(calc(6px * var(--ui-scale)));
+}
+
 .home-dashboard__ring-center {
   position: absolute;
   inset: 0;
@@ -1235,7 +1257,6 @@
   height: calc(12px * var(--ui-scale));
   border-radius: calc(999px * var(--ui-scale));
   background: #f3f2ff;
-  overflow: hidden;
 }
 
 .home-dashboard__card--progress .home-dashboard__progress-fill {
@@ -1250,6 +1271,7 @@
     #ffb6d8 72%,
     #ffd9c3 100%
   );
+  filter: blur(calc(6px * var(--ui-scale)));
 }
 
 .home-dashboard__progress-footer {

@@ -82,11 +82,7 @@ function chaikinSmooth(points: WavePoint[], iterations = 1) {
   return result;
 }
 
-function sampleWaveTopY(
-  x: number,
-  anchors: WavePoint[],
-  edgeRamp: number,
-) {
+function sampleWaveTopY(x: number, anchors: WavePoint[], edgeRamp: number) {
   let weightSum = 0;
   let weightedY = 0;
 
@@ -200,10 +196,9 @@ function useAnimatedValue(target: number, duration = 950) {
 }
 
 function TodayProgressRing({ percent }: TodayProgressRingProps) {
-  const gradientId = React.useId().replace(/:/g, "");
   const animatedPercent = useAnimatedValue(percent);
   const size = 200;
-  const strokeWidth = 18;
+  const strokeWidth = 10;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.min(100, Math.max(0, animatedPercent));
@@ -218,56 +213,41 @@ function TodayProgressRing({ percent }: TodayProgressRingProps) {
         className="home-dashboard__ring-svg"
         viewBox={`0 0 ${size} ${size}`}
       >
-      <defs>
-        <linearGradient
-          gradientUnits="userSpaceOnUse"
-          id={gradientId}
-          x1={center - radius}
-          x2={center + radius}
-          y1={center - radius}
-          y2={center + radius}
-        >
-          <stop offset="0%" stopColor="#74d9ff" />
-          <stop offset="38%" stopColor="#7c73ff" />
-          <stop offset="68%" stopColor="#ffb6d8" />
-          <stop offset="100%" stopColor="#ffc6a5" />
-        </linearGradient>
-        <filter
-          height="140%"
-          id={`${gradientId}-glow`}
-          width="140%"
-          x="-20%"
-          y="-20%"
-        >
-          <feGaussianBlur result="blur" stdDeviation="4" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      <circle
-        className="home-dashboard__ring-track"
-        cx={center}
-        cy={center}
-        fill="none"
-        r={radius}
-        strokeWidth={strokeWidth}
-      />
-      <circle
-        className="home-dashboard__ring-progress"
-        cx={center}
-        cy={center}
-        fill="none"
-        filter={`url(#${gradientId}-glow)`}
-        r={radius}
-        stroke={`url(#${gradientId})`}
-        strokeDasharray={circumference}
-        strokeDashoffset={dashOffset}
-        strokeLinecap="round"
-        strokeWidth={strokeWidth}
-        transform={`rotate(-90 ${center} ${center})`}
-      />
+        <defs>
+          <linearGradient
+            gradientUnits="userSpaceOnUse"
+            id="home-dashboard-ring-progress-gradient"
+            x1={center - radius}
+            x2={center + radius}
+            y1={center - radius}
+            y2={center + radius}
+          >
+            <stop className="home-dashboard__ring-stop-1" offset="0%" />
+            <stop className="home-dashboard__ring-stop-2" offset="38%" />
+            <stop className="home-dashboard__ring-stop-3" offset="68%" />
+            <stop className="home-dashboard__ring-stop-4" offset="100%" />
+          </linearGradient>
+        </defs>
+        <circle
+          className="home-dashboard__ring-track"
+          cx={center}
+          cy={center}
+          fill="none"
+          r={radius}
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          className="home-dashboard__ring-progress"
+          cx={center}
+          cy={center}
+          fill="none"
+          r={radius}
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          strokeLinecap="round"
+          strokeWidth={strokeWidth}
+          transform={`rotate(-90 ${center} ${center})`}
+        />
       </svg>
       <div className="home-dashboard__ring-center">
         <span className="home-dashboard__ring-percent">{displayPercent}%</span>
@@ -296,11 +276,12 @@ export function HomeDashboard() {
   const [hoveredOverviewKey, setHoveredOverviewKey] = React.useState<
     "focus" | "completed" | "pending" | null
   >(null);
-  const [overviewWaveHeights, setOverviewWaveHeights] = React.useState<WaveHeights>({
-    focus: 100,
-    completed: 100,
-    pending: 100,
-  });
+  const [overviewWaveHeights, setOverviewWaveHeights] =
+    React.useState<WaveHeights>({
+      focus: 100,
+      completed: 100,
+      pending: 100,
+    });
   const overviewWaveHeightsRef = React.useRef<WaveHeights>(overviewWaveHeights);
   const overviewWaveGradientId = React.useId().replace(/:/g, "");
 
@@ -312,14 +293,13 @@ export function HomeDashboard() {
     [calendarMonth],
   );
 
-  const dayState =
-    plannerState[selectedDateKey] ?? {
-      tasks: [],
-      completed: [],
-      draft: "",
-      isAdding: false,
-      showCompleted: false,
-    };
+  const dayState = plannerState[selectedDateKey] ?? {
+    tasks: [],
+    completed: [],
+    draft: "",
+    isAdding: false,
+    showCompleted: false,
+  };
 
   const pendingTasks = React.useMemo(
     () => getPendingTasksForDay(plannerState, routines, selectedDate),
@@ -383,8 +363,7 @@ export function HomeDashboard() {
   );
   const focusHours = pomodoroTotalSeconds / 3600;
 
-  const overviewIsEmpty =
-    focusHours + tasksCompleted + pendingTasksCount <= 0;
+  const overviewIsEmpty = focusHours + tasksCompleted + pendingTasksCount <= 0;
 
   const overviewHoverZones = React.useMemo<HomeOverviewZone[]>(
     () => [
@@ -467,9 +446,7 @@ export function HomeDashboard() {
   const handleSelectDate = (date: Date) => {
     const nextDate = stripTime(date);
     setSelectedDate(nextDate);
-    setCalendarMonth(
-      new Date(nextDate.getFullYear(), nextDate.getMonth(), 1),
-    );
+    setCalendarMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
   };
 
   return (
@@ -626,11 +603,14 @@ export function HomeDashboard() {
 
                   return (
                     <button
-                      aria-label={`Select ${day.date.toLocaleDateString("en-US", {
-                        weekday: "long",
-                        month: "long",
-                        day: "numeric",
-                      })}`}
+                      aria-label={`Select ${day.date.toLocaleDateString(
+                        "en-US",
+                        {
+                          weekday: "long",
+                          month: "long",
+                          day: "numeric",
+                        },
+                      )}`}
                       aria-pressed={isSelected}
                       className={[
                         "daily-planner__calendar-day",
