@@ -22,7 +22,16 @@ import { usePlanner } from "@/components/planner-provider"
 import { useReminderUi } from "@/components/reminder-ui-provider"
 import { buildReminderPickerTarget } from "@/components/reminder-picker-modal"
 import { createDraftInputHandlers } from "@/lib/draft-input-handlers"
-import { deletePlannerTaskFromDb } from "@/lib/db/planner-mutations"
+import {
+  createEmptyTaskDumpState,
+  getCloudSnapshot,
+  patchCloudSnapshot,
+  type TaskDumpState,
+} from "@/lib/cloud-store"
+import {
+  APP_DATA_SYNCED_EVENT,
+  schedulePushAppData,
+} from "@/lib/app-data-sync"
 
 type PlannerTask = {
   id: string
@@ -56,14 +65,6 @@ type RoutineDraft = {
   monthDates: number[]
   title: string
   weekDays: number[]
-}
-
-type TaskDumpState = {
-  completed: PlannerTask[]
-  draft: string
-  isAdding: boolean
-  items: PlannerTask[]
-  showCompleted: boolean
 }
 
 type TaskDumpScheduleMenuState = {
@@ -176,6 +177,22 @@ const routineFrequencyOptions: Array<{
   { value: "bi-weekly", label: "Bi-Weekly", description: "Every other week" },
   { value: "monthly", label: "Monthly", description: "Pick month dates" },
 ]
+
+function loadTaskDumpState() {
+  const stored = getCloudSnapshot()?.task_dump_state
+
+  if (!stored) {
+    return createEmptyTaskDumpState()
+  }
+
+  return {
+    ...createEmptyTaskDumpState(),
+    ...stored,
+    items: stored.items ?? [],
+    completed: stored.completed ?? [],
+  }
+}
+
 export function DailyPlannerView() {
   const {
     plannerState,
@@ -201,13 +218,9 @@ export function DailyPlannerView() {
     weekDays: [],
     monthDates: [],
   })
-  const [taskDumpState, setTaskDumpState] = React.useState<TaskDumpState>({
-    items: [],
-    completed: [],
-    draft: "",
-    isAdding: false,
-    showCompleted: false,
-  })
+  const [taskDumpState, setTaskDumpState] = React.useState<TaskDumpState>(() =>
+    loadTaskDumpState(),
+  )
   const [dragTargetDateKey, setDragTargetDateKey] = React.useState<string | null>(null)
   const [editingTask, setEditingTask] = React.useState<EditingTaskState | null>(null)
   const [routineTarget, setRoutineTarget] = React.useState<EditableTaskTarget | null>(null)
@@ -334,10 +347,28 @@ export function DailyPlannerView() {
 
   const updateTaskDump = React.useCallback(
     (updater: (current: TaskDumpState) => TaskDumpState) => {
-      setTaskDumpState((current) => updater(current))
+      setTaskDumpState((current) => {
+        const nextState = updater(current)
+        patchCloudSnapshot({ task_dump_state: nextState })
+        schedulePushAppData()
+        return nextState
+      })
     },
     []
   )
+
+  React.useEffect(() => {
+    const refreshTaskDump = () => {
+      setTaskDumpState(loadTaskDumpState())
+    }
+
+    refreshTaskDump()
+    window.addEventListener(APP_DATA_SYNCED_EVENT, refreshTaskDump)
+
+    return () => {
+      window.removeEventListener(APP_DATA_SYNCED_EVENT, refreshTaskDump)
+    }
+  }, [])
 
   const renderCalendarPopover = (options: {
     month: Date
@@ -633,7 +664,6 @@ export function DailyPlannerView() {
         deleteRoutine(target.task.routineId)
       } else {
         removeRemindersForTask(target.task.id)
-        void deletePlannerTaskFromDb(target.task.id)
         removeTaskTarget(target)
       }
 

@@ -50,7 +50,6 @@ import {
 } from "@/lib/pomodoro-sessions"
 import { APP_DATA_SYNCED_EVENT } from "@/lib/app-data-sync"
 import { createDraftInputHandlers } from "@/lib/draft-input-handlers"
-import { deletePlannerTaskFromDb } from "@/lib/db/planner-mutations"
 import {
   addDays,
   buildCalendarDays,
@@ -647,7 +646,6 @@ export function PomodoroView() {
       )
     } else {
       removeRemindersForTask(task.id)
-      void deletePlannerTaskFromDb(task.id)
       updateDay(dateKey, (day) => ({
         ...day,
         tasks: day.tasks.filter((entry) => entry.id !== task.id),

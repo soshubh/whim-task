@@ -1,17 +1,5 @@
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
-const REALTIME_TABLES = [
-  "routines",
-  "planner_days",
-  "planner_tasks",
-  "reminders",
-  "notification_settings",
-  "pomodoro_timer_settings",
-  "pomodoro_sessions",
-  "daily_update_logs",
-  "profiles",
-] as const
-
 export function subscribeToAppTables(
   userId: string,
   onChange: () => void,
@@ -23,20 +11,31 @@ export function subscribeToAppTables(
   const supabase = getSupabaseClient()
   let channel = supabase.channel(`whim-app:${userId}`)
 
-  for (const table of REALTIME_TABLES) {
-    channel = channel.on(
+  channel = channel
+    .on(
       "postgres_changes",
       {
         event: "*",
         schema: "public",
-        table,
-        filter: table === "profiles" ? `id=eq.${userId}` : `user_id=eq.${userId}`,
+        table: "app_state",
+        filter: `user_id=eq.${userId}`,
       },
       () => {
         onChange()
       },
     )
-  }
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "profiles",
+        filter: `id=eq.${userId}`,
+      },
+      () => {
+        onChange()
+      },
+    )
 
   channel.subscribe()
 

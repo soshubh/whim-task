@@ -3,7 +3,7 @@ import {
   DEFAULT_POMODORO_TIMER_VALUES,
   type PomodoroTimerDefaults,
 } from "@/lib/pomodoro-timer"
-import type { PlannerDayState, RoutineRule } from "@/lib/planner"
+import type { PlannerDayState, PlannerTask, RoutineRule } from "@/lib/planner"
 import type { Reminder } from "@/lib/reminders"
 import {
   DEFAULT_SETTINGS,
@@ -25,7 +25,16 @@ export type CloudSnapshot = {
   pomodoro_timer_defaults: PomodoroTimerDefaults
   reminders: Reminder[]
   routines: RoutineRule[]
+  task_dump_state: TaskDumpState
   updated_at: string
+}
+
+export type TaskDumpState = {
+  completed: PlannerTask[]
+  draft: string
+  isAdding: boolean
+  items: PlannerTask[]
+  showCompleted: boolean
 }
 
 const LEGACY_KEYS = {
@@ -40,6 +49,16 @@ const LEGACY_KEYS = {
 let memorySnapshot: CloudSnapshot | null = null
 let localEditGeneration = 0
 let lastPushCompletedGeneration = 0
+
+export function createEmptyTaskDumpState(): TaskDumpState {
+  return {
+    items: [],
+    completed: [],
+    draft: "",
+    isAdding: false,
+    showCompleted: false,
+  }
+}
 
 export function getCloudSnapshot() {
   return memorySnapshot
@@ -81,8 +100,39 @@ export function createEmptyCloudSnapshot(
     notification_settings: appSettings.notifications,
     pomodoro_timer_defaults: { ...DEFAULT_POMODORO_TIMER_VALUES },
     pomodoro_sessions_by_date: {},
+    task_dump_state: createEmptyTaskDumpState(),
     daily_update_marker: null,
     updated_at: new Date().toISOString(),
+  }
+}
+
+export function normalizeCloudSnapshot(
+  input: Partial<CloudSnapshot> | null | undefined,
+  fallbackSettings: AppSettings = DEFAULT_SETTINGS,
+): CloudSnapshot {
+  const empty = createEmptyCloudSnapshot(fallbackSettings)
+  const appSettings = input?.app_settings ?? empty.app_settings
+
+  return {
+    ...empty,
+    ...input,
+    app_settings: appSettings,
+    notification_settings:
+      input?.notification_settings ??
+      appSettings.notifications ??
+      empty.notification_settings,
+    pomodoro_timer_defaults: {
+      ...empty.pomodoro_timer_defaults,
+      ...(input?.pomodoro_timer_defaults ?? {}),
+    },
+    task_dump_state: {
+      ...empty.task_dump_state,
+      ...(input?.task_dump_state ?? {}),
+      items: input?.task_dump_state?.items ?? empty.task_dump_state.items,
+      completed:
+        input?.task_dump_state?.completed ?? empty.task_dump_state.completed,
+    },
+    updated_at: input?.updated_at ?? empty.updated_at,
   }
 }
 
@@ -185,6 +235,7 @@ export function importLegacyLocalStorage(userId: string): CloudSnapshot | null {
       ...pomodoroTimerDefaults,
     },
     pomodoro_sessions_by_date: pomodoroSessions,
+    task_dump_state: createEmptyTaskDumpState(),
     daily_update_marker: dailyUpdateMarker,
     updated_at: new Date().toISOString(),
   }

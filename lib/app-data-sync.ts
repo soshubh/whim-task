@@ -78,8 +78,14 @@ export function snapshotHasData(snapshot: Pick<
   | "reminders"
   | "routines"
   | "pomodoro_sessions_by_date"
+  | "task_dump_state"
 >) {
-  if (snapshot.routines.length > 0 || snapshot.reminders.length > 0) {
+  if (
+    snapshot.routines.length > 0 ||
+    snapshot.reminders.length > 0 ||
+    snapshot.task_dump_state.items.length > 0 ||
+    snapshot.task_dump_state.completed.length > 0
+  ) {
     return true
   }
 
@@ -316,6 +322,7 @@ export type UserSyncSnapshotRow = {
   pomodoro_timer_defaults: CloudSnapshot["pomodoro_timer_defaults"] | null
   reminders: Reminder[] | null
   routines: RoutineRule[] | null
+  task_dump_state: CloudSnapshot["task_dump_state"] | null
   updated_at: string
   user_id: string
 }
