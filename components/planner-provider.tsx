@@ -24,7 +24,6 @@ import {
 import {
   createInitialPlannerState,
   createEmptyDayState,
-  mergePlannerState,
   type PlannerDayState,
   type RoutineRule,
 } from "@/lib/planner"
@@ -85,13 +84,6 @@ function loadRoutines() {
   return getCloudSnapshot()?.routines ?? []
 }
 
-function mergePlannerStateFromRemote(
-  local: Record<string, PlannerDayState>,
-  remote: Record<string, PlannerDayState>,
-) {
-  return mergePlannerState(local, remote)
-}
-
 export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const { isLoading, session } = useAuth()
   const [plannerState, setPlannerState] = React.useState(() =>
@@ -104,6 +96,18 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     getIsAppDataHydrated(),
   )
   const [isPlannerReady, setIsPlannerReady] = React.useState(false)
+  const skipNextPlannerSyncRef = React.useRef(false)
+  const skipNextRoutineSyncRef = React.useRef(false)
+  const skipNextReminderSyncRef = React.useRef(false)
+
+  const applySnapshotToState = React.useCallback(() => {
+    skipNextPlannerSyncRef.current = true
+    skipNextRoutineSyncRef.current = true
+    skipNextReminderSyncRef.current = true
+    setPlannerState(loadPlannerState())
+    setRoutines(loadRoutines())
+    setReminders(loadReminders())
+  }, [])
 
   React.useEffect(() => {
     const syncHydration = () => {
@@ -127,34 +131,33 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     if (!session) {
       setIsStorageHydrated(false)
       setIsPlannerReady(false)
+      skipNextPlannerSyncRef.current = false
+      skipNextRoutineSyncRef.current = false
+      skipNextReminderSyncRef.current = false
       setPlannerState(createInitialPlannerState())
       setRoutines([])
       setReminders([])
       return
     }
 
-    setPlannerState(loadPlannerState())
-    setRoutines(loadRoutines())
-    setReminders(loadReminders())
+    applySnapshotToState()
     setIsStorageHydrated(true)
     setIsPlannerReady(true)
-  }, [isLoading, session?.userId])
+  }, [applySnapshotToState, isLoading, session?.userId])
 
   React.useEffect(() => {
     const refreshFromCloud = () => {
       if (!session) {
+        skipNextPlannerSyncRef.current = false
+        skipNextRoutineSyncRef.current = false
+        skipNextReminderSyncRef.current = false
         setPlannerState(createInitialPlannerState())
         setRoutines([])
         setReminders([])
         return
       }
 
-      const remotePlanner = loadPlannerState()
-      setPlannerState((current) =>
-        mergePlannerStateFromRemote(current, remotePlanner),
-      )
-      setRoutines(loadRoutines())
-      setReminders(loadReminders())
+      applySnapshotToState()
     }
 
     window.addEventListener(APP_DATA_SYNCED_EVENT, refreshFromCloud)
@@ -162,12 +165,17 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener(APP_DATA_SYNCED_EVENT, refreshFromCloud)
     }
-  }, [session?.userId])
+  }, [applySnapshotToState, session?.userId])
 
   const canSync = session && isStorageHydrated && isAppDataHydrated
 
   React.useEffect(() => {
     if (!canSync) {
+      return
+    }
+
+    if (skipNextPlannerSyncRef.current) {
+      skipNextPlannerSyncRef.current = false
       return
     }
 
@@ -180,12 +188,22 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    if (skipNextRoutineSyncRef.current) {
+      skipNextRoutineSyncRef.current = false
+      return
+    }
+
     patchCloudSnapshot({ routines })
     schedulePushAppData()
   }, [routines, canSync])
 
   React.useEffect(() => {
     if (!canSync) {
+      return
+    }
+
+    if (skipNextReminderSyncRef.current) {
+      skipNextReminderSyncRef.current = false
       return
     }
 
