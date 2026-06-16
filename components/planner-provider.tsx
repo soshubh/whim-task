@@ -125,6 +125,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (isLoading) {
       setIsPlannerReady(false)
+      setIsStorageHydrated(false)
       return
     }
 
@@ -140,10 +141,16 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    if (!isAppDataHydrated) {
+      setIsStorageHydrated(false)
+      setIsPlannerReady(false)
+      return
+    }
+
     applySnapshotToState()
     setIsStorageHydrated(true)
     setIsPlannerReady(true)
-  }, [applySnapshotToState, isLoading, session?.userId])
+  }, [applySnapshotToState, isAppDataHydrated, isLoading, session?.userId])
 
   React.useEffect(() => {
     const refreshFromCloud = () => {
