@@ -34,21 +34,135 @@ type HomeOverviewSegment = {
   width: number;
 };
 
+type WaveHeights = {
+  focus: number;
+  completed: number;
+  pending: number;
+};
+
+type WavePoint = {
+  x: number;
+  y: number;
+};
+
+function easeOutCubic(progress: number) {
+  return 1 - Math.pow(1 - progress, 3);
+}
+
+function smoothstep(edge0: number, edge1: number, x: number) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+function chaikinSmooth(points: WavePoint[], iterations = 1) {
+  let result = points;
+
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    const next: WavePoint[] = [result[0]];
+
+    for (let index = 0; index < result.length - 1; index += 1) {
+      const start = result[index];
+      const end = result[index + 1];
+
+      next.push(
+        {
+          x: start.x * 0.75 + end.x * 0.25,
+          y: start.y * 0.75 + end.y * 0.25,
+        },
+        {
+          x: start.x * 0.25 + end.x * 0.75,
+          y: start.y * 0.25 + end.y * 0.75,
+        },
+      );
+    }
+
+    next.push(result[result.length - 1]);
+    result = next;
+  }
+
+  return result;
+}
+
+function sampleWaveTopY(
+  x: number,
+  anchors: WavePoint[],
+  edgeRamp: number,
+) {
+  let weightSum = 0;
+  let weightedY = 0;
+
+  for (let index = 0; index < anchors.length; index += 1) {
+    const anchor = anchors[index];
+    const previous = anchors[index - 1];
+    const next = anchors[index + 1];
+    const leftSpan = previous ? anchor.x - previous.x : 0.34;
+    const rightSpan = next ? next.x - anchor.x : 0.34;
+    const sigma = Math.max(0.11, Math.min(leftSpan, rightSpan) * 0.68);
+
+    const weight = Math.exp(-((x - anchor.x) ** 2) / (2 * sigma ** 2));
+    weightSum += weight;
+    weightedY += weight * anchor.y;
+  }
+
+  const blendedY = weightSum > 0 ? weightedY / weightSum : 1;
+  const edgeInfluence =
+    smoothstep(0, edgeRamp, x) * smoothstep(0, edgeRamp, 1 - x);
+
+  return 1 - (1 - blendedY) * edgeInfluence;
+}
+
+function buildOverviewWavePath(
+  heights: WaveHeights,
+  width = 1200,
+  height = 120,
+) {
+  const yFocus = 1 - heights.focus / 100;
+  const yCompleted = 1 - heights.completed / 100;
+  const yPending = 1 - heights.pending / 100;
+
+  const anchors: WavePoint[] = [
+    { x: 0.22, y: yFocus },
+    { x: 0.5, y: yCompleted },
+    { x: 0.78, y: yPending },
+  ];
+
+  const samples = 48;
+  const topPoints: WavePoint[] = [];
+
+  for (let index = 0; index <= samples; index += 1) {
+    const x = index / samples;
+    topPoints.push({
+      x: x * width,
+      y: sampleWaveTopY(x, anchors, 0.16) * height,
+    });
+  }
+
+  const smoothedPoints = chaikinSmooth(topPoints, 2);
+
+  let path = `M 0 ${height} L ${smoothedPoints[0].x} ${smoothedPoints[0].y}`;
+
+  for (let index = 0; index < smoothedPoints.length - 1; index += 1) {
+    const previous = smoothedPoints[index - 1] ?? smoothedPoints[index];
+    const current = smoothedPoints[index];
+    const next = smoothedPoints[index + 1];
+    const afterNext = smoothedPoints[index + 2] ?? next;
+    const tension = 12;
+
+    const controlOneX = current.x + (next.x - previous.x) / tension;
+    const controlOneY = current.y + (next.y - previous.y) / tension;
+    const controlTwoX = next.x - (afterNext.x - current.x) / tension;
+    const controlTwoY = next.y - (afterNext.y - current.y) / tension;
+
+    path += ` C ${controlOneX} ${controlOneY}, ${controlTwoX} ${controlTwoY}, ${next.x} ${next.y}`;
+  }
+
+  path += ` L ${width} ${height} Z`;
+  return path;
+}
+
 function formatFocusTime(totalSeconds: number) {
   return formatPomodoroDuration(totalSeconds);
 }
-
-const OVERVIEW_GRADIENT = `linear-gradient(
-  to right,
-  var(--card) 0%,
-  color-mix(in srgb, var(--primary) 28%, white) 5%,
-  var(--primary) 12%,
-  color-mix(in srgb, var(--primary) 84%, white) 30%,
-  color-mix(in srgb, var(--primary) 56%, white) 50%,
-  color-mix(in srgb, var(--primary) 28%, white) 70%,
-  color-mix(in srgb, var(--primary) 8%, white) 88%,
-  var(--card) 100%
-)`;
 
 type TodayProgressRingProps = {
   percent: number;
@@ -127,6 +241,13 @@ export function HomeDashboard() {
   const [hoveredOverviewKey, setHoveredOverviewKey] = React.useState<
     "focus" | "completed" | "pending" | null
   >(null);
+  const [overviewWaveHeights, setOverviewWaveHeights] = React.useState<WaveHeights>({
+    focus: 100,
+    completed: 100,
+    pending: 100,
+  });
+  const overviewWaveHeightsRef = React.useRef<WaveHeights>(overviewWaveHeights);
+  const overviewWaveGradientId = React.useId().replace(/:/g, "");
 
   const selectedDateKey = toDateKey(selectedDate);
   const isSelectedToday = isTodayDate(selectedDate);
@@ -213,7 +334,6 @@ export function HomeDashboard() {
 
     if (isEmpty) {
       return {
-        gradient: OVERVIEW_GRADIENT,
         isEmpty: true,
         segments: [
           {
@@ -243,7 +363,6 @@ export function HomeDashboard() {
     const pendingPct = (pending / total) * 100;
 
     return {
-      gradient: OVERVIEW_GRADIENT,
       isEmpty: false,
       segments: [
         {
@@ -268,6 +387,63 @@ export function HomeDashboard() {
     };
   }, [focusHours, pendingTasksCount, pomodoroTotalSeconds, tasksCompleted]);
 
+  const overviewWaveTargets = React.useMemo(() => {
+    const focusValue = focusHours;
+    const completedValue = tasksCompleted;
+    const pendingValue = pendingTasksCount;
+    const maxValue = Math.max(focusValue, completedValue, pendingValue);
+
+    const toHeight = (value: number) => {
+      if (maxValue <= 0) {
+        return 14;
+      }
+
+      return Math.max(14, (value / maxValue) * 100);
+    };
+
+    return {
+      focus: toHeight(focusValue),
+      completed: toHeight(completedValue),
+      pending: toHeight(pendingValue),
+    };
+  }, [focusHours, pendingTasksCount, tasksCompleted]);
+
+  const overviewMotionKey = `${selectedDateKey}:${tasksCompleted}:${pendingTasksCount}:${pomodoroTotalSeconds}`;
+
+  React.useEffect(() => {
+    const target = overviewWaveTargets;
+    const start = { ...overviewWaveHeightsRef.current };
+    const duration = 950;
+    const startedAt = performance.now();
+    let frameId = 0;
+
+    const tick = (now: number) => {
+      const progress = easeOutCubic(Math.min(1, (now - startedAt) / duration));
+      const next = {
+        focus: start.focus + (target.focus - start.focus) * progress,
+        completed:
+          start.completed + (target.completed - start.completed) * progress,
+        pending: start.pending + (target.pending - start.pending) * progress,
+      };
+
+      overviewWaveHeightsRef.current = next;
+      setOverviewWaveHeights(next);
+
+      if (progress < 1) {
+        frameId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [overviewMotionKey, overviewWaveTargets]);
+
+  const overviewWavePath = React.useMemo(
+    () => buildOverviewWavePath(overviewWaveHeights),
+    [overviewWaveHeights],
+  );
+
   const handleSelectDate = (date: Date) => {
     const nextDate = stripTime(date);
     setSelectedDate(nextDate);
@@ -286,15 +462,49 @@ export function HomeDashboard() {
             </h2>
           </div>
 
-          <div className="home-dashboard__overview-gradient">
+          <div
+            className={[
+              "home-dashboard__overview-gradient",
+              overviewSegments.isEmpty
+                ? "home-dashboard__overview-gradient--empty"
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
             <div
               aria-hidden="true"
-              className="home-dashboard__overview-gradient-glow"
+              className="home-dashboard__overview-glow-panel"
             >
-              <div
-                className="home-dashboard__overview-gradient-fill"
-                style={{ background: overviewSegments.gradient }}
-              />
+              <div className="home-dashboard__overview-blob home-dashboard__overview-blob--purple" />
+              <div className="home-dashboard__overview-blob home-dashboard__overview-blob--pink" />
+
+              <div className="home-dashboard__overview-wave-wrap">
+                <svg
+                  className="home-dashboard__overview-wave"
+                  preserveAspectRatio="none"
+                  viewBox="0 0 1200 120"
+                >
+                  <defs>
+                    <linearGradient
+                      id={overviewWaveGradientId}
+                      x1="0%"
+                      x2="100%"
+                      y1="0%"
+                      y2="0%"
+                    >
+                      <stop offset="0%" stopColor="#74d9ff" />
+                      <stop offset="35%" stopColor="#7c73ff" />
+                      <stop offset="68%" stopColor="#ffb6d8" />
+                      <stop offset="100%" stopColor="#ffc6a5" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d={overviewWavePath}
+                    fill={`url(#${overviewWaveGradientId})`}
+                  />
+                </svg>
+              </div>
             </div>
 
             <div className="home-dashboard__overview-zones">
