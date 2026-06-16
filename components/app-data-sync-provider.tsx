@@ -6,7 +6,6 @@ import { useAuth } from "@/components/auth-provider"
 import {
   flushPushAppData,
   subscribeToRemoteAppState,
-  syncAppDataFromRemote,
 } from "@/lib/app-data-sync"
 
 export function AppDataSyncProvider({
@@ -26,30 +25,6 @@ export function AppDataSyncProvider({
     })
 
     return unsubscribe
-  }, [isLoading, session?.userId])
-
-  React.useEffect(() => {
-    if (isLoading || !session?.userId) {
-      return
-    }
-
-    const refreshFromCloud = () => {
-      void syncAppDataFromRemote(session.userId)
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        refreshFromCloud()
-      }
-    }
-
-    window.addEventListener("focus", refreshFromCloud)
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-
-    return () => {
-      window.removeEventListener("focus", refreshFromCloud)
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-    }
   }, [isLoading, session?.userId])
 
   React.useEffect(() => {

@@ -24,6 +24,7 @@ import {
 import {
   createInitialPlannerState,
   createEmptyDayState,
+  mergePlannerState,
   type PlannerDayState,
   type RoutineRule,
 } from "@/lib/planner"
@@ -86,15 +87,7 @@ function mergePlannerStateFromRemote(
   local: Record<string, PlannerDayState>,
   remote: Record<string, PlannerDayState>,
 ) {
-  const merged: Record<string, PlannerDayState> = { ...remote }
-
-  for (const [dateKey, localDay] of Object.entries(local)) {
-    if (localDay.isAdding) {
-      merged[dateKey] = localDay
-    }
-  }
-
-  return merged
+  return mergePlannerState(local, remote)
 }
 
 export function PlannerProvider({ children }: { children: React.ReactNode }) {
@@ -223,12 +216,21 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       dateKey: string,
       updater: (day: PlannerDayState) => PlannerDayState,
     ) => {
-      setPlannerState((current) => ({
-        ...current,
-        [dateKey]: updater(current[dateKey] ?? createEmptyDayState()),
-      }))
+      setPlannerState((current) => {
+        const nextState = {
+          ...current,
+          [dateKey]: updater(current[dateKey] ?? createEmptyDayState()),
+        }
+
+        if (isStorageHydrated) {
+          patchCloudSnapshot({ planner_state: nextState })
+          schedulePushAppData()
+        }
+
+        return nextState
+      })
     },
-    [],
+    [isStorageHydrated],
   )
 
   const upsertTaskReminder = React.useCallback(

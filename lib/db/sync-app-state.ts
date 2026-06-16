@@ -28,6 +28,39 @@ function taskToRow(
   }
 }
 
+async function deleteTasksRemovedFromDay(
+  dayId: string,
+  keepTaskIds: Set<string>,
+) {
+  const supabase = getSupabaseClient()
+  const { data: existingTasks, error } = await supabase
+    .from("planner_tasks")
+    .select("id")
+    .eq("day_id", dayId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const taskIdsToDelete =
+    existingTasks
+      ?.map((row) => row.id as string)
+      .filter((id) => !keepTaskIds.has(id)) ?? []
+
+  if (taskIdsToDelete.length === 0) {
+    return
+  }
+
+  const { error: deleteError } = await supabase
+    .from("planner_tasks")
+    .delete()
+    .in("id", taskIdsToDelete)
+
+  if (deleteError) {
+    throw new Error(deleteError.message)
+  }
+}
+
 export async function syncAppStateToDb(
   userId: string,
   snapshot: CloudSnapshot,
@@ -80,9 +113,6 @@ export async function syncAppStateToDb(
     }
   }
 
-  const dayIdByDateKey = new Map<string, string>()
-  const taskRows: ReturnType<typeof taskToRow>[] = []
-
   for (const [dateKey, day] of Object.entries(snapshot.planner_state)) {
     const { data: dayRow, error: dayError } = await supabase
       .from("planner_days")
@@ -103,84 +133,37 @@ export async function syncAppStateToDb(
       throw new Error(dayError?.message || "Could not save planner day.")
     }
 
-    dayIdByDateKey.set(dateKey, dayRow.id as string)
-
     let sortOrder = 0
+    const keepTaskIds = new Set<string>()
+    const dayTaskRows: ReturnType<typeof taskToRow>[] = []
+
     for (const task of day.tasks) {
-      taskRows.push(
+      dayTaskRows.push(
         taskToRow(userId, dayRow.id as string, task, "active", sortOrder),
       )
+      keepTaskIds.add(task.id)
       sortOrder += 1
     }
 
     for (const task of day.completed) {
-      taskRows.push(
+      dayTaskRows.push(
         taskToRow(userId, dayRow.id as string, task, "completed", sortOrder),
       )
+      keepTaskIds.add(task.id)
       sortOrder += 1
     }
-  }
 
-  const { data: existingTasks, error: existingTasksError } = await supabase
-    .from("planner_tasks")
-    .select("id")
-    .eq("user_id", userId)
+    if (dayTaskRows.length > 0) {
+      const { error } = await supabase.from("planner_tasks").upsert(dayTaskRows, {
+        onConflict: "id",
+      })
 
-  if (existingTasksError) {
-    throw new Error(existingTasksError.message)
-  }
-
-  const taskIds = new Set(taskRows.map((row) => row.id))
-  const taskIdsToDelete =
-    existingTasks
-      ?.map((row) => row.id as string)
-      .filter((id) => !taskIds.has(id)) ?? []
-
-  if (taskRows.length > 0) {
-    const { error } = await supabase.from("planner_tasks").upsert(taskRows, {
-      onConflict: "id",
-    })
-
-    if (error) {
-      throw new Error(error.message)
+      if (error) {
+        throw new Error(error.message)
+      }
     }
-  }
 
-  if (taskIdsToDelete.length > 0) {
-    const { error } = await supabase
-      .from("planner_tasks")
-      .delete()
-      .in("id", taskIdsToDelete)
-
-    if (error) {
-      throw new Error(error.message)
-    }
-  }
-
-  const { data: existingDays, error: existingDaysError } = await supabase
-    .from("planner_days")
-    .select("id, date_key")
-    .eq("user_id", userId)
-
-  if (existingDaysError) {
-    throw new Error(existingDaysError.message)
-  }
-
-  const dayKeys = new Set(Object.keys(snapshot.planner_state))
-  const dayIdsToDelete =
-    existingDays
-      ?.filter((row) => !dayKeys.has(row.date_key as string))
-      .map((row) => row.id as string) ?? []
-
-  if (dayIdsToDelete.length > 0) {
-    const { error } = await supabase
-      .from("planner_days")
-      .delete()
-      .in("id", dayIdsToDelete)
-
-    if (error) {
-      throw new Error(error.message)
-    }
+    await deleteTasksRemovedFromDay(dayRow.id as string, keepTaskIds)
   }
 
   const reminderRows = snapshot.reminders.map((reminder) => ({
@@ -239,8 +222,8 @@ export async function syncAppStateToDb(
   const { error: pomodoroTimerError } = await supabase
     .from("pomodoro_timer_settings")
     .upsert(pomodoroTimerToRow(userId, snapshot.pomodoro_timer_defaults), {
-      onConflict: "user_id",
-    })
+      onConflict: "user_id" },
+    )
 
   if (pomodoroTimerError) {
     throw new Error(pomodoroTimerError.message)

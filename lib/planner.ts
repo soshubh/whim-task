@@ -121,6 +121,58 @@ export function getDayState(
   return plannerState[dateKey] ?? createEmptyDayState()
 }
 
+function mergeTaskList(remote: PlannerTask[], local: PlannerTask[]) {
+  const merged = new Map<string, PlannerTask>()
+
+  for (const task of remote) {
+    merged.set(task.id, task)
+  }
+
+  for (const task of local) {
+    merged.set(task.id, task)
+  }
+
+  return Array.from(merged.values())
+}
+
+export function countPlannerTasks(plannerState: Record<string, PlannerDayState>) {
+  return Object.values(plannerState).reduce(
+    (total, day) => total + day.tasks.length + day.completed.length,
+    0,
+  )
+}
+
+export function mergePlannerState(
+  local: Record<string, PlannerDayState>,
+  remote: Record<string, PlannerDayState>,
+) {
+  const dateKeys = new Set([
+    ...Object.keys(local),
+    ...Object.keys(remote),
+  ])
+  const merged: Record<string, PlannerDayState> = {}
+
+  for (const dateKey of dateKeys) {
+    const localDay = local[dateKey] ?? createEmptyDayState()
+    const remoteDay = remote[dateKey] ?? createEmptyDayState()
+
+    if (localDay.isAdding) {
+      merged[dateKey] = localDay
+      continue
+    }
+
+    merged[dateKey] = {
+      tasks: mergeTaskList(remoteDay.tasks, localDay.tasks),
+      completed: mergeTaskList(remoteDay.completed, localDay.completed),
+      draft: "",
+      isAdding: false,
+      showCompleted: remoteDay.showCompleted || localDay.showCompleted,
+    }
+  }
+
+  return merged
+}
+
 export function getPendingTasksForDay(
   plannerState: Record<string, PlannerDayState>,
   routines: RoutineRule[],
