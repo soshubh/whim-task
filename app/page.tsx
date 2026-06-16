@@ -242,28 +242,28 @@ function AppShell() {
             <SettingsLayer onLogout={handleLogout} />
           </div>
         </div>
-
-        <nav
-          aria-label="Primary navigation"
-          className="app-mobile-nav"
-        >
-          {mobileNavItems.map((item) => (
-            <button
-              aria-current={activeSection === item.key ? "page" : undefined}
-              aria-label={item.label}
-              className={cn(
-                "app-mobile-nav__item",
-                activeSection === item.key && "app-mobile-nav__item--active",
-              )}
-              key={item.key}
-              onClick={() => handleSectionChange(item.key)}
-              type="button"
-            >
-              {item.icon}
-            </button>
-          ))}
-        </nav>
       </main>
+
+      <nav
+        aria-label="Primary navigation"
+        className="app-mobile-nav"
+      >
+        {mobileNavItems.map((item) => (
+          <button
+            aria-current={activeSection === item.key ? "page" : undefined}
+            aria-label={item.label}
+            className={cn(
+              "app-mobile-nav__item",
+              activeSection === item.key && "app-mobile-nav__item--active",
+            )}
+            key={item.key}
+            onClick={() => handleSectionChange(item.key)}
+            type="button"
+          >
+            {item.icon}
+          </button>
+        ))}
+      </nav>
     </>
   )
 }

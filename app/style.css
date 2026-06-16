@@ -4025,7 +4025,7 @@
   position: fixed;
   bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
   left: 50%;
-  z-index: 50;
+  z-index: 70;
   width: fit-content;
   max-width: calc(100% - var(--space-8));
   align-items: center;
@@ -4033,7 +4033,7 @@
   gap: calc(20px * var(--ui-scale));
   border-radius: calc(999px * var(--ui-scale));
   background: #ffffff;
-  padding: calc(8px * var(--ui-scale)) calc(20px * var(--ui-scale));
+  padding: calc(8px * var(--ui-scale));
   transform: translateX(-50%);
   border: 1px solid var(--border);
   box-shadow: none;
@@ -4289,10 +4289,15 @@
 
 @media (max-width: 767px) {
   .app-body {
+    --app-mobile-nav-height: calc(60px * var(--ui-scale));
+    --app-mobile-nav-clearance: calc(
+      var(--app-mobile-nav-height) + var(--space-4) + var(--space-6) +
+        env(safe-area-inset-bottom, 0px)
+    );
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
-    padding: var(--space-4);
+    padding: var(--space-4) var(--space-4) 0 var(--space-4);
     gap: 0;
   }
 
@@ -4356,6 +4361,7 @@
   .app-main {
     height: 100%;
     min-height: 0;
+    overflow: visible;
   }
 
   .app-main__frame {
@@ -4379,9 +4385,8 @@
     border-radius: 0;
     background: transparent;
     padding: 0;
-    padding-bottom: calc(
-      96px * var(--ui-scale) + env(safe-area-inset-bottom, 0px)
-    );
+    padding-bottom: var(--app-mobile-nav-clearance);
+    scroll-padding-bottom: var(--app-mobile-nav-clearance);
     scrollbar-width: none;
     -ms-overflow-style: none;
     -webkit-overflow-scrolling: touch;
@@ -4398,6 +4403,7 @@
     height: auto;
     overflow: visible;
     display: block;
+    padding-bottom: var(--space-2);
   }
 
   .home-dashboard {
