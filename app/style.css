@@ -502,6 +502,7 @@
   gap: var(--space-3);
   background: var(--card);
   box-shadow: none;
+  padding: var(--space-4) var(--space-4) var(--space-0) var(--space-4);
 }
 
 .home-dashboard__today-row {
@@ -526,6 +527,12 @@
   gap: var(--space-3);
 }
 
+.home-dashboard__card--today-status .home-dashboard__card-title {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: var(--foreground);
+}
+
 .home-dashboard__today-status-body {
   display: flex;
   min-height: 0;
@@ -534,7 +541,6 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  overflow: hidden;
   padding-top: var(--space-1);
 }
 
@@ -555,18 +561,11 @@
 .home-dashboard__ring-svg {
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
 
-.home-dashboard__ring-track {
-  stroke: color-mix(in srgb, var(--primary) 10%, white);
-}
-
-.home-dashboard__ring-stop-start {
-  stop-color: var(--primary);
-}
-
-.home-dashboard__ring-stop-end {
-  stop-color: color-mix(in srgb, var(--primary) 54%, white);
+.home-dashboard__ring-svg .home-dashboard__ring-track {
+  stroke: #eef0fb;
 }
 
 .home-dashboard__ring-center {
@@ -788,7 +787,7 @@
   height: calc(160px * var(--ui-scale));
   min-height: calc(72px * var(--ui-scale));
   margin: calc(4px * var(--ui-scale)) 0 0;
-  overflow: hidden;
+  overflow: visible;
   border: 0;
 }
 
@@ -796,7 +795,6 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border-radius: calc(28px * var(--ui-scale));
   background: transparent;
   border: 0;
   isolation: isolate;
@@ -883,18 +881,25 @@
   z-index: 2;
   display: flex;
   width: 100%;
-  border-radius: calc(28px * var(--ui-scale));
-  overflow: hidden;
+  overflow: visible;
 }
 
 .home-dashboard__overview-zone {
   position: relative;
+  flex: 1 1 0;
   height: 100%;
+  min-width: 0;
   border: 0;
   padding: 0;
   background: transparent;
   cursor: pointer;
-  min-width: 0;
+}
+
+.home-dashboard__overview-zone:hover,
+.home-dashboard__overview-zone:focus,
+.home-dashboard__overview-zone:active {
+  background: transparent;
+  box-shadow: none;
 }
 
 .home-dashboard__overview-zone:focus-visible {
@@ -951,6 +956,46 @@
   opacity: 1;
   visibility: visible;
   transform: translate(calc(12px * var(--ui-scale)), -50%);
+}
+
+.home-dashboard__overview-zone--focus .home-dashboard__overview-tooltip,
+.home-dashboard__overview-zone--focus
+  .home-dashboard__overview-tooltip--visible,
+.home-dashboard__overview-zone--focus:focus-visible
+  .home-dashboard__overview-tooltip--visible {
+  left: calc(12px * var(--ui-scale));
+  right: auto;
+  transform: translate(0, -50%);
+}
+
+.home-dashboard__overview-zone--focus .home-dashboard__overview-tooltip {
+  transform: translate(0, calc(-50% + calc(8px * var(--ui-scale))));
+}
+
+.home-dashboard__overview-zone--completed .home-dashboard__overview-tooltip {
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, calc(-50% + calc(8px * var(--ui-scale))));
+}
+
+.home-dashboard__overview-zone--completed
+  .home-dashboard__overview-tooltip--visible,
+.home-dashboard__overview-zone--completed:focus-visible
+  .home-dashboard__overview-tooltip--visible {
+  transform: translate(-50%, -50%);
+}
+
+.home-dashboard__overview-zone--pending .home-dashboard__overview-tooltip {
+  left: auto;
+  right: calc(12px * var(--ui-scale));
+  transform: translate(0, calc(-50% + calc(8px * var(--ui-scale))));
+}
+
+.home-dashboard__overview-zone--pending
+  .home-dashboard__overview-tooltip--visible,
+.home-dashboard__overview-zone--pending:focus-visible
+  .home-dashboard__overview-tooltip--visible {
+  transform: translate(0, -50%);
 }
 
 .home-dashboard__overview-tooltip strong {
@@ -1184,26 +1229,27 @@
   background: color-mix(in srgb, var(--primary) 4%, white);
 }
 
-.home-dashboard__progress-bar {
-  position: relative;
-  height: calc(16px * var(--ui-scale));
+.home-dashboard__card--progress .home-dashboard__progress-bar {
+  display: flex;
+  width: 100%;
+  height: calc(12px * var(--ui-scale));
   border-radius: calc(999px * var(--ui-scale));
-  background: color-mix(in srgb, var(--primary) 8%, white);
+  background: #f3f2ff;
   overflow: hidden;
 }
 
-.home-dashboard__progress-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: inherit;
+.home-dashboard__card--progress .home-dashboard__progress-fill {
+  flex: 0 0 auto;
+  height: 100%;
+  min-width: 0;
+  border-radius: calc(999px * var(--ui-scale));
   background: linear-gradient(
-    to right,
-    var(--primary) 0%,
-    color-mix(in srgb, var(--primary) 84%, white) 45%,
-    color-mix(in srgb, var(--primary) 56%, white) 100%
+    90deg,
+    #a5e7ff 0%,
+    #bfbbff 42%,
+    #ffb6d8 72%,
+    #ffd9c3 100%
   );
-  box-shadow: 0 0 calc(12px * var(--ui-scale))
-    color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
 .home-dashboard__progress-footer {

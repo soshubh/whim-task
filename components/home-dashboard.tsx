@@ -27,11 +27,10 @@ import {
   WEEK_DAY_OPTIONS,
 } from "@/lib/planner";
 
-type HomeOverviewSegment = {
+type HomeOverviewZone = {
   key: "focus" | "completed" | "pending";
   label: string;
   value: string;
-  width: number;
 };
 
 type WaveHeights = {
@@ -168,34 +167,84 @@ type TodayProgressRingProps = {
   percent: number;
 };
 
+function useAnimatedValue(target: number, duration = 950) {
+  const [value, setValue] = React.useState(0);
+  const valueRef = React.useRef(0);
+
+  React.useEffect(() => {
+    const start = valueRef.current;
+    if (start === target) {
+      return;
+    }
+
+    const startedAt = performance.now();
+    let frameId = 0;
+
+    const tick = (now: number) => {
+      const progress = easeOutCubic(Math.min(1, (now - startedAt) / duration));
+      const next = start + (target - start) * progress;
+      valueRef.current = next;
+      setValue(next);
+
+      if (progress < 1) {
+        frameId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [target, duration]);
+
+  return value;
+}
+
 function TodayProgressRing({ percent }: TodayProgressRingProps) {
   const gradientId = React.useId().replace(/:/g, "");
+  const animatedPercent = useAnimatedValue(percent);
   const size = 200;
   const strokeWidth = 18;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(100, Math.max(0, percent));
+  const progress = Math.min(100, Math.max(0, animatedPercent));
   const dashOffset = circumference - (progress / 100) * circumference;
   const center = size / 2;
+  const displayPercent = Math.round(progress);
 
   return (
-    <svg
-      aria-hidden="true"
-      className="home-dashboard__ring-svg"
-      viewBox={`0 0 ${size} ${size}`}
-    >
+    <>
+      <svg
+        aria-hidden="true"
+        className="home-dashboard__ring-svg"
+        viewBox={`0 0 ${size} ${size}`}
+      >
       <defs>
         <linearGradient
           gradientUnits="userSpaceOnUse"
           id={gradientId}
           x1={center - radius}
           x2={center + radius}
-          y1={center}
-          y2={center}
+          y1={center - radius}
+          y2={center + radius}
         >
-          <stop className="home-dashboard__ring-stop-start" offset="0%" />
-          <stop className="home-dashboard__ring-stop-end" offset="100%" />
+          <stop offset="0%" stopColor="#74d9ff" />
+          <stop offset="38%" stopColor="#7c73ff" />
+          <stop offset="68%" stopColor="#ffb6d8" />
+          <stop offset="100%" stopColor="#ffc6a5" />
         </linearGradient>
+        <filter
+          height="140%"
+          id={`${gradientId}-glow`}
+          width="140%"
+          x="-20%"
+          y="-20%"
+        >
+          <feGaussianBlur result="blur" stdDeviation="4" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
       <circle
         className="home-dashboard__ring-track"
@@ -210,6 +259,7 @@ function TodayProgressRing({ percent }: TodayProgressRingProps) {
         cx={center}
         cy={center}
         fill="none"
+        filter={`url(#${gradientId}-glow)`}
         r={radius}
         stroke={`url(#${gradientId})`}
         strokeDasharray={circumference}
@@ -218,7 +268,12 @@ function TodayProgressRing({ percent }: TodayProgressRingProps) {
         strokeWidth={strokeWidth}
         transform={`rotate(-90 ${center} ${center})`}
       />
-    </svg>
+      </svg>
+      <div className="home-dashboard__ring-center">
+        <span className="home-dashboard__ring-percent">{displayPercent}%</span>
+        <span className="home-dashboard__ring-copy">Goal</span>
+      </div>
+    </>
   );
 }
 
@@ -281,6 +336,8 @@ export function HomeDashboard() {
     () => getLifetimeTaskStats(plannerState, routines),
     [plannerState, routines],
   );
+  const animatedLifetimePercent = useAnimatedValue(lifetimeStats.percent);
+  const displayLifetimePercent = Math.round(animatedLifetimePercent);
 
   React.useEffect(() => {
     const refreshPomodoroData = () => {
@@ -326,66 +383,29 @@ export function HomeDashboard() {
   );
   const focusHours = pomodoroTotalSeconds / 3600;
 
-  const overviewSegments = React.useMemo(() => {
-    const completed = tasksCompleted;
-    const pending = pendingTasksCount;
-    const total = focusHours + completed + pending;
-    const isEmpty = total <= 0;
+  const overviewIsEmpty =
+    focusHours + tasksCompleted + pendingTasksCount <= 0;
 
-    if (isEmpty) {
-      return {
-        isEmpty: true,
-        segments: [
-          {
-            key: "focus" as const,
-            label: "Focus time",
-            value: formatFocusTime(pomodoroTotalSeconds),
-            width: 33.34,
-          },
-          {
-            key: "completed" as const,
-            label: "Completed tasks",
-            value: `${completed} completed`,
-            width: 33.33,
-          },
-          {
-            key: "pending" as const,
-            label: "Pending tasks",
-            value: `${pending} pending`,
-            width: 33.33,
-          },
-        ],
-      };
-    }
-
-    const focusPct = (focusHours / total) * 100;
-    const completedPct = (completed / total) * 100;
-    const pendingPct = (pending / total) * 100;
-
-    return {
-      isEmpty: false,
-      segments: [
-        {
-          key: "focus" as const,
-          label: "Focus time",
-          value: formatFocusTime(pomodoroTotalSeconds),
-          width: focusPct,
-        },
-        {
-          key: "completed" as const,
-          label: "Completed tasks",
-          value: `${completed} completed`,
-          width: completedPct,
-        },
-        {
-          key: "pending" as const,
-          label: "Pending tasks",
-          value: `${pending} pending`,
-          width: pendingPct,
-        },
-      ],
-    };
-  }, [focusHours, pendingTasksCount, pomodoroTotalSeconds, tasksCompleted]);
+  const overviewHoverZones = React.useMemo<HomeOverviewZone[]>(
+    () => [
+      {
+        key: "focus",
+        label: "Focus time",
+        value: formatFocusTime(pomodoroTotalSeconds),
+      },
+      {
+        key: "completed",
+        label: "Completed tasks",
+        value: `${tasksCompleted} completed`,
+      },
+      {
+        key: "pending",
+        label: "Pending tasks",
+        value: `${pendingTasksCount} pending`,
+      },
+    ],
+    [pendingTasksCount, pomodoroTotalSeconds, tasksCompleted],
+  );
 
   const overviewWaveTargets = React.useMemo(() => {
     const focusValue = focusHours;
@@ -465,9 +485,7 @@ export function HomeDashboard() {
           <div
             className={[
               "home-dashboard__overview-gradient",
-              overviewSegments.isEmpty
-                ? "home-dashboard__overview-gradient--empty"
-                : "",
+              overviewIsEmpty ? "home-dashboard__overview-gradient--empty" : "",
             ]
               .filter(Boolean)
               .join(" ")}
@@ -508,36 +526,26 @@ export function HomeDashboard() {
             </div>
 
             <div className="home-dashboard__overview-zones">
-              {overviewSegments.segments
-                .filter((segment) => segment.width > 0)
-                .map((segment) => (
+              {overviewHoverZones.map((zone) => (
                 <button
-                  aria-label={`${segment.label}: ${segment.value}`}
-                  className={`home-dashboard__overview-zone home-dashboard__overview-zone--${segment.key} ${
-                    hoveredOverviewKey === segment.key
-                      ? "home-dashboard__overview-zone--active"
-                      : ""
-                  }`}
-                  key={segment.key}
+                  aria-label={`${zone.label}: ${zone.value}`}
+                  className={`home-dashboard__overview-zone home-dashboard__overview-zone--${zone.key}`}
+                  key={zone.key}
                   onBlur={() => setHoveredOverviewKey(null)}
-                  onFocus={() => setHoveredOverviewKey(segment.key)}
-                  onMouseEnter={() => setHoveredOverviewKey(segment.key)}
+                  onFocus={() => setHoveredOverviewKey(zone.key)}
+                  onMouseEnter={() => setHoveredOverviewKey(zone.key)}
                   onMouseLeave={() => setHoveredOverviewKey(null)}
-                  style={{
-                    width: `${segment.width}%`,
-                    minWidth: segment.width > 0 ? "48px" : "0",
-                  }}
                   type="button"
                 >
                   <span
                     className={`home-dashboard__overview-tooltip ${
-                      hoveredOverviewKey === segment.key
+                      hoveredOverviewKey === zone.key
                         ? "home-dashboard__overview-tooltip--visible"
                         : ""
                     }`}
                   >
-                    <strong>{segment.value}</strong>
-                    <span>{segment.label}</span>
+                    <strong>{zone.value}</strong>
+                    <span>{zone.label}</span>
                   </span>
                 </button>
               ))}
@@ -705,12 +713,6 @@ export function HomeDashboard() {
                 className="home-dashboard__ring-shell"
               >
                 <TodayProgressRing percent={completionPercent} />
-                <div className="home-dashboard__ring-center">
-                  <span className="home-dashboard__ring-percent">
-                    {completionPercent}%
-                  </span>
-                  <span className="home-dashboard__ring-copy">Goal</span>
-                </div>
               </div>
 
               <p className="home-dashboard__today-footnote">
@@ -774,14 +776,14 @@ export function HomeDashboard() {
             <h2 className="home-dashboard__card-title">Overall progress</h2>
 
             <p className="home-dashboard__progress-value">
-              {lifetimeStats.percent}%
+              {displayLifetimePercent}%
             </p>
           </div>
 
           <div className="home-dashboard__progress-bar">
-            <span
+            <div
               className="home-dashboard__progress-fill"
-              style={{ width: `${lifetimeStats.percent}%` }}
+              style={{ width: `${animatedLifetimePercent}%` }}
             />
           </div>
 
