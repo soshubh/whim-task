@@ -48,14 +48,14 @@ const mobileNavItems: Array<{
 }> = [
   { key: "home", label: "Home", icon: <Home className="size-5" /> },
   {
-    key: "pomodoro",
-    label: "Pomodoro",
-    icon: <Sparkles className="size-5" />,
-  },
-  {
     key: "daily-planner",
     label: "Daily Planner",
     icon: <CalendarDays className="size-5" />,
+  },
+  {
+    key: "pomodoro",
+    label: "Pomodoro",
+    icon: <Sparkles className="size-5" />,
   },
 ]
 

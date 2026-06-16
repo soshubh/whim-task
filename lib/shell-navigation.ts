@@ -2,8 +2,8 @@ import type { ShellSection } from "@/components/app-sidebar"
 
 export const SHELL_SECTIONS: ShellSection[] = [
   "home",
-  "pomodoro",
   "daily-planner",
+  "pomodoro",
 ]
 
 export const SHELL_SECTION_QUERY_KEY = "section"

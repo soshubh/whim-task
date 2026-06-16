@@ -22,12 +22,12 @@ const items: Array<{
   icon: React.ReactNode;
 }> = [
   { key: "home", title: "Home", icon: <Home className="size-6" /> },
-  { key: "pomodoro", title: "Pomodoro", icon: <Sparkles className="size-6" /> },
   {
     key: "daily-planner",
     title: "Daily Planner",
     icon: <CalendarDays className="size-6" />,
   },
+  { key: "pomodoro", title: "Pomodoro", icon: <Sparkles className="size-6" /> },
 ];
 
 const utilityItems = [
