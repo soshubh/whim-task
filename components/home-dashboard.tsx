@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { useIsMobile } from "@/hooks/use-mobile";
 import { usePlanner } from "@/components/planner-provider";
 import { TodayTasksPanel } from "@/components/today-tasks-panel";
 import {
@@ -13,10 +14,13 @@ import {
   loadPomodoroSessionLogs,
   type PomodoroSessionLog,
 } from "@/lib/pomodoro-sessions";
+import { cn } from "@/lib/utils";
 import {
+  addDays,
   buildCalendarDays,
   countRoutinesForDay,
   formatCalendarMonth,
+  formatMobileCalendarDate,
   formatSelectedDateLabel,
   getLifetimeTaskStats,
   getPendingTasksForDay,
@@ -263,12 +267,14 @@ function getDayHeadingLabel(date: Date) {
 
 export function HomeDashboard() {
   const { plannerState, routines } = usePlanner();
+  const isMobile = useIsMobile();
   const today = React.useMemo(() => stripTime(new Date()), []);
   const todayDateKey = toDateKey(today);
   const [selectedDate, setSelectedDate] = React.useState(today);
   const [calendarMonth, setCalendarMonth] = React.useState(
     () => new Date(today.getFullYear(), today.getMonth(), 1),
   );
+  const [calendarExpanded, setCalendarExpanded] = React.useState(false);
   const [focusSessions, setFocusSessions] = React.useState(0);
   const [pomodoroLogs, setPomodoroLogs] = React.useState<PomodoroSessionLog[]>(
     [],
@@ -449,6 +455,128 @@ export function HomeDashboard() {
     setCalendarMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
   };
 
+  const handleShiftSelectedDay = (delta: number) => {
+    handleSelectDate(addDays(selectedDate, delta));
+  };
+
+  const handleMobileSelectDate = (date: Date) => {
+    handleSelectDate(date);
+    setCalendarExpanded(false);
+  };
+
+  React.useEffect(() => {
+    if (!isMobile) {
+      setCalendarExpanded(false);
+    }
+  }, [isMobile]);
+
+  const renderCalendarMonthHeader = () => (
+    <div className="daily-planner__calendar-header home-dashboard__calendar-header">
+      <button
+        aria-label="Previous month"
+        className="daily-planner__icon-button"
+        onClick={() =>
+          setCalendarMonth(
+            (current) =>
+              new Date(current.getFullYear(), current.getMonth() - 1, 1),
+          )
+        }
+        type="button"
+      >
+        <ChevronLeft className="size-4" />
+      </button>
+      <span className="daily-planner__calendar-title">
+        {formatCalendarMonth(calendarMonth)}
+      </span>
+      <button
+        aria-label="Next month"
+        className="daily-planner__icon-button"
+        onClick={() =>
+          setCalendarMonth(
+            (current) =>
+              new Date(current.getFullYear(), current.getMonth() + 1, 1),
+          )
+        }
+        type="button"
+      >
+        <ChevronRight className="size-4" />
+      </button>
+    </div>
+  );
+
+  const renderCalendarWeekdays = () => (
+    <div className="daily-planner__calendar-weekdays" aria-hidden="true">
+      {WEEK_DAY_OPTIONS.map((day) => (
+        <span className="daily-planner__calendar-weekday" key={day.label}>
+          {day.label}
+        </span>
+      ))}
+    </div>
+  );
+
+  const renderCalendarGrid = (onSelectDate: (date: Date) => void) => (
+    <div className="daily-planner__calendar-grid home-dashboard__calendar-grid">
+      {calendarDays.map((day) => {
+        const dayKey = toDateKey(day.date);
+        const isSelected = dayKey === selectedDateKey;
+        const isTodayDay = dayKey === todayDateKey;
+        const isCurrentMonth =
+          day.date.getMonth() === calendarMonth.getMonth();
+        const routineCount = countRoutinesForDay(routines, day.date);
+        const isCompleted = isDayFullyCompleted(
+          plannerState,
+          routines,
+          day.date,
+        );
+
+        return (
+          <button
+            aria-label={`Select ${day.date.toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}`}
+            aria-pressed={isSelected}
+            className={[
+              "daily-planner__calendar-day",
+              "home-dashboard__calendar-day",
+              !isCurrentMonth ? "daily-planner__calendar-day--muted" : "",
+              isTodayDay ? "daily-planner__calendar-day--today" : "",
+              isSelected ? "daily-planner__calendar-day--selected" : "",
+              isCompleted ? "home-dashboard__calendar-day--completed" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            key={dayKey}
+            onClick={() => onSelectDate(day.date)}
+            type="button"
+          >
+            <span className="home-dashboard__calendar-day-number">
+              {day.date.getDate()}
+            </span>
+            {routineCount > 0 ? (
+              <span
+                aria-label={`${routineCount} routine${
+                  routineCount === 1 ? "" : "s"
+                }`}
+                className="home-dashboard__calendar-routines"
+              >
+                {Array.from({
+                  length: Math.min(routineCount, 4),
+                }).map((_, index) => (
+                  <span
+                    className="home-dashboard__calendar-routine-dot"
+                    key={`${dayKey}-routine-${index}`}
+                  />
+                ))}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <section className="home-dashboard" aria-label="Home dashboard">
       <div className="home-dashboard__grid">
@@ -533,40 +661,28 @@ export function HomeDashboard() {
         <div className="home-dashboard__sidebar">
           <article className="home-dashboard__card home-dashboard__card--calendar">
             <div className="home-dashboard__calendar-panel">
-              <div className="daily-planner__calendar-header home-dashboard__calendar-header">
+              <div className="home-dashboard__calendar-compact">
                 <button
-                  aria-label="Previous month"
+                  aria-label="Previous day"
                   className="daily-planner__icon-button"
-                  onClick={() =>
-                    setCalendarMonth(
-                      (current) =>
-                        new Date(
-                          current.getFullYear(),
-                          current.getMonth() - 1,
-                          1,
-                        ),
-                    )
-                  }
+                  onClick={() => handleShiftSelectedDay(-1)}
                   type="button"
                 >
                   <ChevronLeft className="size-4" />
                 </button>
-                <span className="daily-planner__calendar-title">
-                  {formatCalendarMonth(calendarMonth)}
-                </span>
                 <button
-                  aria-label="Next month"
+                  aria-expanded={calendarExpanded}
+                  aria-label={`${formatMobileCalendarDate(selectedDate)}. Show calendar`}
+                  className="home-dashboard__calendar-date-button"
+                  onClick={() => setCalendarExpanded((open) => !open)}
+                  type="button"
+                >
+                  {formatMobileCalendarDate(selectedDate)}
+                </button>
+                <button
+                  aria-label="Next day"
                   className="daily-planner__icon-button"
-                  onClick={() =>
-                    setCalendarMonth(
-                      (current) =>
-                        new Date(
-                          current.getFullYear(),
-                          current.getMonth() + 1,
-                          1,
-                        ),
-                    )
-                  }
+                  onClick={() => handleShiftSelectedDay(1)}
                   type="button"
                 >
                   <ChevronRight className="size-4" />
@@ -574,87 +690,21 @@ export function HomeDashboard() {
               </div>
 
               <div
-                className="daily-planner__calendar-weekdays"
-                aria-hidden="true"
+                className={cn(
+                  "home-dashboard__calendar-expand",
+                  calendarExpanded && "home-dashboard__calendar-expand--open",
+                )}
               >
-                {WEEK_DAY_OPTIONS.map((day) => (
-                  <span
-                    className="daily-planner__calendar-weekday"
-                    key={day.label}
-                  >
-                    {day.label}
-                  </span>
-                ))}
+                <div className="home-dashboard__calendar-expand-inner">
+                  {renderCalendarWeekdays()}
+                  {renderCalendarGrid(handleMobileSelectDate)}
+                </div>
               </div>
 
-              <div className="daily-planner__calendar-grid home-dashboard__calendar-grid">
-                {calendarDays.map((day) => {
-                  const dayKey = toDateKey(day.date);
-                  const isSelected = dayKey === selectedDateKey;
-                  const isTodayDay = dayKey === todayDateKey;
-                  const isCurrentMonth =
-                    day.date.getMonth() === calendarMonth.getMonth();
-                  const routineCount = countRoutinesForDay(routines, day.date);
-                  const isCompleted = isDayFullyCompleted(
-                    plannerState,
-                    routines,
-                    day.date,
-                  );
-
-                  return (
-                    <button
-                      aria-label={`Select ${day.date.toLocaleDateString(
-                        "en-US",
-                        {
-                          weekday: "long",
-                          month: "long",
-                          day: "numeric",
-                        },
-                      )}`}
-                      aria-pressed={isSelected}
-                      className={[
-                        "daily-planner__calendar-day",
-                        "home-dashboard__calendar-day",
-                        !isCurrentMonth
-                          ? "daily-planner__calendar-day--muted"
-                          : "",
-                        isTodayDay ? "daily-planner__calendar-day--today" : "",
-                        isSelected
-                          ? "daily-planner__calendar-day--selected"
-                          : "",
-                        isCompleted
-                          ? "home-dashboard__calendar-day--completed"
-                          : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      key={dayKey}
-                      onClick={() => handleSelectDate(day.date)}
-                      type="button"
-                    >
-                      <span className="home-dashboard__calendar-day-number">
-                        {day.date.getDate()}
-                      </span>
-                      {routineCount > 0 ? (
-                        <span
-                          aria-label={`${routineCount} routine${
-                            routineCount === 1 ? "" : "s"
-                          }`}
-                          className="home-dashboard__calendar-routines"
-                        >
-                          {Array.from({
-                            length: Math.min(routineCount, 4),
-                          }).map((_, index) => (
-                            <span
-                              className="home-dashboard__calendar-routine-dot"
-                              key={`${dayKey}-routine-${index}`}
-                            />
-                          ))}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
+              <div className="home-dashboard__calendar-body--desktop">
+                {renderCalendarMonthHeader()}
+                {renderCalendarWeekdays()}
+                {renderCalendarGrid(handleSelectDate)}
               </div>
             </div>
           </article>

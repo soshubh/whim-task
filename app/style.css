@@ -1047,6 +1047,19 @@
   flex-shrink: 0;
 }
 
+.home-dashboard__calendar-compact,
+.home-dashboard__calendar-expand {
+  display: none;
+}
+
+.home-dashboard__calendar-body--desktop {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .home-dashboard__calendar-panel .daily-planner__calendar-weekdays {
   margin-top: var(--space-3);
   flex-shrink: 0;
@@ -1291,19 +1304,32 @@
   gap: var(--space-4);
 }
 
-.daily-planner__toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+.daily-planner__toolbar,
+.daily-planner__header {
+  display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: var(--space-4);
+  justify-content: space-between;
+  gap: var(--space-3);
   width: 100%;
+  flex-shrink: 0;
 }
 
 .daily-planner__views {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.daily-planner__views::-webkit-scrollbar {
+  display: none;
 }
 
 .daily-planner__view-chip {
@@ -1333,17 +1359,25 @@
   color: var(--foreground);
 }
 
-.daily-planner__toolbar-actions {
+.daily-planner__toolbar-actions,
+.daily-planner__date-nav {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  justify-self: end;
+  flex-shrink: 0;
+  width: auto;
 }
 
-.daily-planner__date-picker {
-  position: relative;
+.daily-planner__calendar-chip {
+  padding: var(--space-3);
+}
+
+.daily-planner__date-nav .daily-planner__calendar {
+  top: calc(100% + var(--space-3));
+  left: auto;
+  right: 0;
+  transform: none;
 }
 
 .daily-planner__date-button {
@@ -1494,11 +1528,14 @@
   width: 100%;
   min-height: 0;
   flex: 1;
+  justify-content: stretch;
+  align-items: stretch;
 }
 
 .daily-planner__columns {
   display: grid;
   width: 100%;
+  max-width: none;
   min-height: 0;
   height: 100%;
   flex: 1;
@@ -1807,7 +1844,9 @@
 .task-dump {
   display: flex;
   width: 100%;
+  max-width: none;
   min-height: 0;
+  height: 100%;
   flex: 1;
   flex-direction: column;
   gap: var(--space-4);
@@ -2824,6 +2863,10 @@
   font-size: var(--font-size-sm);
 }
 
+.content-drawer__logout-link {
+  display: none;
+}
+
 .notification-toasts {
   position: absolute;
   top: var(--space-4);
@@ -3076,6 +3119,39 @@
 .pomodoro__tasks .daily-planner__day-body {
   flex: 1;
   min-height: 0;
+}
+
+.pomodoro__day-header--mobile {
+  display: none;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.pomodoro__day-header--mobile .pomodoro__day-title {
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.pomodoro__date-nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.pomodoro__date-nav-label {
+  min-width: 0;
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: var(--line-height-snug);
+  white-space: nowrap;
+  padding: 0 var(--space-1);
 }
 
 .pomodoro__day-header {
@@ -3845,6 +3921,149 @@
   border-radius: calc(12px * var(--ui-scale));
 }
 
+.app-mobile-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-shrink: 0;
+}
+
+.app-mobile-header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.app-mobile-header__logo {
+  width: calc(40px * var(--ui-scale));
+  height: calc(40px * var(--ui-scale));
+  flex: none;
+  object-fit: contain;
+}
+
+.app-mobile-header__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: calc(2px * var(--ui-scale));
+}
+
+.app-mobile-header__title {
+  color: var(--foreground);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.app-mobile-header__subtitle {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.2;
+}
+
+.app-mobile-header__actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  border-radius: calc(999px * var(--ui-scale));
+  background: #ffffff;
+  padding: calc(6px * var(--ui-scale)) calc(8px * var(--ui-scale))
+    calc(6px * var(--ui-scale)) calc(12px * var(--ui-scale));
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.app-mobile-header__bell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(36px * var(--ui-scale));
+  height: calc(36px * var(--ui-scale));
+  border: 0;
+  border-radius: calc(999px * var(--ui-scale));
+  background: transparent;
+  color: var(--foreground);
+}
+
+.app-mobile-header__bell--shake {
+  animation: bell-shake 620ms ease-in-out;
+}
+
+.app-mobile-header__profile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.app-mobile-header__avatar,
+.app-mobile-header__avatar-fallback {
+  width: calc(36px * var(--ui-scale));
+  height: calc(36px * var(--ui-scale));
+  border-radius: calc(999px * var(--ui-scale));
+  object-fit: cover;
+}
+
+.app-mobile-header__avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--secondary);
+  color: var(--foreground);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.app-mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  z-index: 50;
+  width: fit-content;
+  max-width: calc(100% - var(--space-8));
+  align-items: center;
+  justify-content: center;
+  gap: calc(20px * var(--ui-scale));
+  border-radius: calc(999px * var(--ui-scale));
+  background: #ffffff;
+  padding: calc(8px * var(--ui-scale)) calc(20px * var(--ui-scale));
+  transform: translateX(-50%);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.app-mobile-nav__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(44px * var(--ui-scale));
+  height: calc(44px * var(--ui-scale));
+  border: 0;
+  border-radius: calc(999px * var(--ui-scale));
+  background: transparent;
+  color: var(--foreground);
+  flex: none;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.app-mobile-nav__item--active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
 @media (min-width: 768px) {
   .app-sidebar {
     position: relative;
@@ -4044,13 +4263,20 @@
     height: 100%;
   }
 
-  .daily-planner__toolbar {
-    grid-template-columns: minmax(0, 1fr) auto;
+  .daily-planner__toolbar,
+  .daily-planner__header {
+    flex-direction: row;
     align-items: center;
+    justify-content: space-between;
   }
 
-  .daily-planner__toolbar-actions {
-    justify-self: end;
+  .daily-planner__views {
+    justify-content: flex-start;
+  }
+
+  .daily-planner__toolbar-actions,
+  .daily-planner__date-nav {
+    justify-content: flex-end;
     width: auto;
   }
 
@@ -4073,7 +4299,64 @@
     height: 100dvh;
     overflow: hidden;
     padding: var(--space-4);
-    gap: var(--space-4);
+    gap: 0;
+  }
+
+  .app-sidebar {
+    display: none;
+  }
+
+  .app-mobile-header {
+    display: flex;
+  }
+
+  .app-mobile-nav {
+    display: flex;
+  }
+
+  .content-drawer__backdrop {
+    position: fixed;
+    z-index: 59;
+  }
+
+  .content-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 60;
+    width: 100%;
+    max-width: 100%;
+    border-left: 0;
+  }
+
+  .content-drawer--open {
+    box-shadow: none;
+  }
+
+  .content-drawer__content {
+    padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .content-drawer__footer {
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .content-drawer__logout-link {
+    display: inline-flex;
+    align-items: center;
+    border: 0;
+    background: transparent;
+    color: #e11d48;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-snug);
+    padding: var(--space-2) 0;
+  }
+
+  .content-drawer__logout-link:active {
+    opacity: 0.72;
   }
 
   .app-main {
@@ -4084,6 +4367,11 @@
   .app-main__frame {
     height: 100%;
     max-height: 100%;
+    gap: var(--space-4);
+  }
+
+  .app-main__header {
+    display: none;
   }
 
   .app-main__content {
@@ -4091,6 +4379,37 @@
     min-height: 0;
     height: 100%;
     max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    flex-direction: column;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    padding-bottom: calc(
+      96px * var(--ui-scale) + env(safe-area-inset-bottom, 0px)
+    );
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-main__content::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-main__content-stage {
+    flex: none;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+    overflow: visible;
+    display: block;
+  }
+
+  .home-dashboard {
+    height: auto;
+    flex: none;
+    overflow: visible;
   }
 
   .home-dashboard__grid {
@@ -4104,6 +4423,9 @@
       "today"
       "progress";
     width: 100%;
+    height: auto;
+    gap: var(--space-4);
+    overflow: visible;
     justify-items: stretch;
   }
 
@@ -4118,8 +4440,82 @@
     grid-area: calendar;
   }
 
+  .home-dashboard__calendar-compact {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .home-dashboard__calendar-date-button {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    background: transparent;
+    color: var(--foreground);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: -0.02em;
+    line-height: var(--line-height-snug);
+    text-align: center;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .home-dashboard__calendar-expand {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .home-dashboard__calendar-expand--open {
+    grid-template-rows: 1fr;
+  }
+
+  .home-dashboard__calendar-expand-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .home-dashboard__calendar-expand-inner .daily-planner__calendar-weekdays,
+  .home-dashboard__calendar-expand-inner .home-dashboard__calendar-grid {
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+
+  .home-dashboard__calendar-expand-inner .daily-planner__calendar-weekdays {
+    margin-top: var(--space-3);
+  }
+
+  .home-dashboard__calendar-expand-inner .home-dashboard__calendar-grid {
+    flex: none;
+    overflow: visible;
+  }
+
+  .home-dashboard__calendar-expand--open
+    .home-dashboard__calendar-expand-inner
+    .daily-planner__calendar-weekdays,
+  .home-dashboard__calendar-expand--open
+    .home-dashboard__calendar-expand-inner
+    .home-dashboard__calendar-grid {
+    opacity: 1;
+  }
+
+  .home-dashboard__calendar-routines {
+    display: none;
+  }
+
+  .home-dashboard__calendar-body--desktop {
+    display: none;
+  }
+
   .home-dashboard__card--today-tasks {
     grid-area: today-tasks;
+  }
+
+  .home-dashboard__card--hero {
+    grid-area: hero;
+    height: auto;
+    min-height: calc(200px * var(--ui-scale));
   }
 
   .home-dashboard__sidebar > .home-dashboard__card {
@@ -4133,6 +4529,10 @@
     width: 100%;
     height: auto;
     padding: var(--space-5);
+    border: 1px solid var(--border);
+    border-radius: calc(28px * var(--ui-scale));
+    background: var(--card);
+    box-shadow: none;
   }
 
   .home-dashboard__today-row {
@@ -4156,12 +4556,75 @@
   }
 
   .pomodoro__layout {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
     min-height: 0;
+    height: auto;
   }
 
   .pomodoro {
     min-height: 0;
+    height: auto;
+    flex: none;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .pomodoro__timer-panel {
+    order: -1;
+    width: 100%;
+    height: auto;
+    flex: none;
+    border: 1px solid var(--border);
+    border-radius: calc(28px * var(--ui-scale));
+    background: var(--card);
+    box-shadow: none;
+  }
+
+  .pomodoro__timer-panel .pomodoro__timer-body {
+    flex: none;
+  }
+
+  .pomodoro__tasks {
+    order: 0;
+    display: flex;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    flex: none;
+    overflow: visible;
+    align-self: stretch;
+    border: 1px solid var(--border);
+    border-radius: calc(28px * var(--ui-scale));
+    background: var(--card);
+    padding: var(--space-4);
+    box-shadow: none;
+  }
+
+  .pomodoro__tasks .daily-planner__day-body {
+    flex: none;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .pomodoro__day-header--desktop {
+    display: none;
+  }
+
+  .pomodoro__day-header--mobile {
+    display: flex;
+  }
+
+  .pomodoro__date-nav .daily-planner__calendar {
+    top: calc(100% + var(--space-2));
+    left: auto;
+    right: 0;
+    transform: none;
+    width: min(100vw - var(--space-8), calc(320px * var(--ui-scale)));
   }
 
   .home-dashboard__ring-shell {
@@ -4172,7 +4635,7 @@
   .home-task-card,
   .home-task-card__trailing {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .home-task-card {
@@ -4214,84 +4677,70 @@
     font-size: var(--font-size-xs);
   }
 
-  .app-main__header {
-    flex-direction: column;
-    align-items: stretch;
-    padding-top: 0;
-  }
-
-  .app-main__header-actions {
-    width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .app-main__search {
-    width: 100%;
-    min-height: 60px;
-    flex-basis: auto;
-  }
-
-  .app-main__search-input {
-    font-size: 16px;
-  }
-
   .daily-planner {
-    flex: 1;
-    min-height: calc(100vh - 220px * var(--ui-scale));
-    height: 100%;
+    flex: none;
+    min-height: 0;
+    height: auto;
+    gap: var(--space-4);
   }
 
-  .daily-planner__toolbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
+  .daily-planner__header {
+    width: 100%;
+    height: auto;
+    padding: var(--space-5);
+    border: 1px solid var(--border);
+    border-radius: calc(28px * var(--ui-scale));
+    background: var(--card);
+    box-shadow: none;
   }
 
   .daily-planner__views {
-    width: auto;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 
-  .daily-planner__toolbar-actions {
-    justify-self: end;
-    width: auto;
+  .daily-planner__views::-webkit-scrollbar {
+    display: none;
   }
 
-  .daily-planner__date-picker {
-    width: auto;
-  }
-
-  .daily-planner__date-button {
-    width: auto;
-    min-width: 0;
-  }
-
-  .daily-planner__calendar {
-    left: auto;
-    right: 0;
-  }
-
-  .daily-planner__toolbar-button {
+  .daily-planner__view-chip {
     flex: 0 0 auto;
   }
 
-  .daily-planner__content {
-    flex: 1;
-    min-height: 0;
+  .daily-planner__columns {
+    max-width: none;
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    height: auto;
   }
 
-  .daily-planner__columns {
-    grid-template-columns: 1fr;
-    grid-auto-rows: minmax(0, 1fr);
-    height: 100%;
+  .daily-planner__content {
+    flex: none;
+    min-height: 0;
+    height: auto;
+    overflow: visible;
   }
 
   .daily-planner__day:not(.daily-planner__day--center) {
     display: none;
   }
 
+  .pomodoro .pomodoro__tasks.daily-planner__day {
+    display: flex;
+  }
+
   .daily-planner__day--center {
-    height: 100%;
+    height: auto;
     min-height: 0;
+  }
+
+  .daily-planner__day-body {
+    flex: none;
+    min-height: 0;
+    overflow: visible;
   }
 
   .task-dump__composer,

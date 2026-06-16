@@ -275,6 +275,33 @@ export function formatCalendarMonth(date: Date) {
   }).format(date)
 }
 
+function getOrdinalSuffix(day: number) {
+  if (day >= 11 && day <= 13) {
+    return "th"
+  }
+
+  switch (day % 10) {
+    case 1:
+      return "st"
+    case 2:
+      return "nd"
+    case 3:
+      return "rd"
+    default:
+      return "th"
+  }
+}
+
+export function formatMobileCalendarDate(date: Date) {
+  const day = date.getDate()
+  const monthYear = new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    year: "numeric",
+  }).format(date)
+
+  return `${day}${getOrdinalSuffix(day)} ${monthYear}`
+}
+
 export function buildCalendarDays(month: Date) {
   const firstDay = new Date(month.getFullYear(), month.getMonth(), 1)
   const startDate = addDays(firstDay, -firstDay.getDay())

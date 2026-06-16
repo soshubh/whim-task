@@ -27,10 +27,11 @@ const SOUND_OPTIONS: Array<{ label: string; value: NotificationSound }> = [
 
 type SettingsPanelProps = {
   onClose: () => void
+  onLogout?: () => void
   open: boolean
 }
 
-export function SettingsPanel({ onClose, open }: SettingsPanelProps) {
+export function SettingsPanel({ onClose, onLogout, open }: SettingsPanelProps) {
   const {
     browserPermission,
     commitSettings,
@@ -384,6 +385,22 @@ export function SettingsPanel({ onClose, open }: SettingsPanelProps) {
                 </p>
               </SettingsItem>
             ) : null}
+          </SettingsGroup>
+        </section>
+      ) : null}
+
+      {onLogout ? (
+        <section className="content-drawer__section content-drawer__section--compact">
+          <SettingsGroup>
+            <SettingsItem>
+              <button
+                className="content-drawer__logout-link"
+                onClick={onLogout}
+                type="button"
+              >
+                Logout
+              </button>
+            </SettingsItem>
           </SettingsGroup>
         </section>
       ) : null}

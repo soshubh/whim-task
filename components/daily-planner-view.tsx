@@ -1181,75 +1181,51 @@ export function DailyPlannerView() {
     )
   }
 
-  const renderDailyView = () => (
-    <div className="daily-planner__toolbar-actions">
+  const renderDailyDateNav = () => (
+    <div className="daily-planner__date-nav" ref={datePickerRef}>
       <button
-        className="daily-planner__toolbar-button daily-planner__date-button"
-        onClick={() => setCenterDate(stripTime(today))}
+        aria-expanded={isCalendarOpen}
+        aria-label={`${formatPlannerCardDate(centerDate)}. Open calendar`}
+        className={`daily-planner__view-chip daily-planner__calendar-chip ${
+          isCalendarOpen ? "daily-planner__view-chip--active" : ""
+        }`}
+        onClick={() => {
+          setCalendarMonth(new Date(centerDate.getFullYear(), centerDate.getMonth(), 1))
+          setIsCalendarOpen((current) => !current)
+        }}
         type="button"
       >
-        {formatSelectedDateLabel(centerDate)}
+        <CalendarDays className="size-4" />
       </button>
 
-      <div className="daily-planner__date-picker" ref={datePickerRef}>
-        <button
-          aria-label="Open calendar"
-          className="daily-planner__toolbar-button"
-          onClick={() => {
-            setCalendarMonth(new Date(centerDate.getFullYear(), centerDate.getMonth(), 1))
-            setIsCalendarOpen((current) => !current)
-          }}
-          type="button"
-        >
-          <CalendarDays className="size-4" />
-        </button>
-
-        {isCalendarOpen ? (
-          renderCalendarPopover({
-            month: calendarMonth,
-            onNextMonth: () =>
-              setCalendarMonth(
-                (current) => new Date(current.getFullYear(), current.getMonth() + 1, 1)
-              ),
-            onPreviousMonth: () =>
-              setCalendarMonth(
-                (current) => new Date(current.getFullYear(), current.getMonth() - 1, 1)
-              ),
-            onSelectDate: (date) => {
-              const nextDate = stripTime(date)
-              setCenterDate(nextDate)
-              setCalendarMonth(
-                new Date(nextDate.getFullYear(), nextDate.getMonth(), 1),
-              )
-              setIsCalendarOpen(false)
-            },
-            selectedDate: centerDate,
-          })
-        ) : null}
-      </div>
-
-      <button
-        aria-label="Previous day"
-        className="daily-planner__icon-button"
-        onClick={() => setCenterDate((current) => addDays(current, -1))}
-        type="button"
-      >
-        <ChevronLeft className="size-4" />
-      </button>
-      <button
-        aria-label="Next day"
-        className="daily-planner__icon-button"
-        onClick={() => setCenterDate((current) => addDays(current, 1))}
-        type="button"
-      >
-        <ChevronRight className="size-4" />
-      </button>
+      {isCalendarOpen ? (
+        renderCalendarPopover({
+          month: calendarMonth,
+          onNextMonth: () =>
+            setCalendarMonth(
+              (current) => new Date(current.getFullYear(), current.getMonth() + 1, 1)
+            ),
+          onPreviousMonth: () =>
+            setCalendarMonth(
+              (current) => new Date(current.getFullYear(), current.getMonth() - 1, 1)
+            ),
+          onSelectDate: (date) => {
+            const nextDate = stripTime(date)
+            setCenterDate(nextDate)
+            setCalendarMonth(
+              new Date(nextDate.getFullYear(), nextDate.getMonth(), 1),
+            )
+            setIsCalendarOpen(false)
+          },
+          selectedDate: centerDate,
+        })
+      ) : null}
     </div>
   )
 
   return (
     <section className="daily-planner" aria-label="Daily planner">
-      <div className="daily-planner__toolbar">
+      <header className="daily-planner__header">
         <div className="daily-planner__views" aria-label="Planner views" role="tablist">
           {plannerViews.map((view) => {
             const Icon = view.icon
@@ -1272,8 +1248,8 @@ export function DailyPlannerView() {
           })}
         </div>
 
-        {activeView === "daily-planner" ? renderDailyView() : null}
-      </div>
+        {activeView === "daily-planner" ? renderDailyDateNav() : null}
+      </header>
 
       {activeView === "daily-planner" ? (
         <div className="daily-planner__content">
@@ -2184,27 +2160,6 @@ function formatCalendarMonth(date: Date) {
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
-  }).format(date)
-}
-
-function formatToolbarDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    month: "long",
-    weekday: "short",
-    year: "numeric",
-  }).format(date)
-}
-
-function formatSelectedDateLabel(date: Date) {
-  if (toDateKey(date) === initialTodayKey) {
-    return "Today"
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    month: "short",
-    weekday: "short",
   }).format(date)
 }
 

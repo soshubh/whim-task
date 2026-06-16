@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react"
 
+import { useIsMobile } from "@/hooks/use-mobile"
 import { usePlanner } from "@/components/planner-provider"
 import { buildReminderPickerTarget } from "@/components/reminder-picker-modal"
 import { useReminderUi } from "@/components/reminder-ui-provider"
@@ -135,6 +136,7 @@ export function PomodoroView() {
     updateDay,
   } = usePlanner()
   const { openReminderPicker } = useReminderUi()
+  const isMobile = useIsMobile()
   const [selectedDate, setSelectedDate] = React.useState(() => stripTime(new Date()))
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false)
   const [calendarMonth, setCalendarMonth] = React.useState(() =>
@@ -929,32 +931,17 @@ export function PomodoroView() {
             isToday ? "daily-planner__day--today" : ""
           }`}
         >
-          <header
-            className={`daily-planner__day-header pomodoro__day-header ${
-              !isToday ? "pomodoro__day-header--tasks-only" : ""
-            }`}
-          >
-            {isToday ? (
-              <div className="pomodoro__day-heading">
-                <h2 className="daily-planner__day-date pomodoro__day-title">
-                  Today&apos;s Tasks
-                </h2>
-              </div>
-            ) : null}
+          {isMobile ? (
+            <header className="daily-planner__day-header pomodoro__day-header pomodoro__day-header--mobile">
+              <h2 className="daily-planner__day-date pomodoro__day-title">
+                Today&apos;s Tasks
+              </h2>
 
-            <div className="daily-planner__toolbar-actions pomodoro__day-toolbar">
-              <button
-                className="daily-planner__toolbar-button daily-planner__date-button"
-                onClick={() => setSelectedDate(stripTime(new Date()))}
-                type="button"
-              >
-                {formatSelectedDateLabel(selectedDate)}
-              </button>
-
-              <div className="daily-planner__date-picker" ref={datePickerRef}>
+              <div className="pomodoro__date-nav" ref={datePickerRef}>
                 <button
+                  aria-expanded={isCalendarOpen}
                   aria-label="Open calendar"
-                  className="daily-planner__toolbar-button"
+                  className="daily-planner__icon-button"
                   onClick={() => {
                     setCalendarMonth(
                       new Date(
@@ -972,25 +959,71 @@ export function PomodoroView() {
 
                 {isCalendarOpen ? renderCalendarPopover() : null}
               </div>
+            </header>
+          ) : (
+            <header
+              className={`daily-planner__day-header pomodoro__day-header pomodoro__day-header--desktop ${
+                !isToday ? "pomodoro__day-header--tasks-only" : ""
+              }`}
+            >
+              {isToday ? (
+                <div className="pomodoro__day-heading">
+                  <h2 className="daily-planner__day-date pomodoro__day-title">
+                    Today&apos;s Tasks
+                  </h2>
+                </div>
+              ) : null}
 
-              <button
-                aria-label="Previous day"
-                className="daily-planner__icon-button"
-                onClick={() => setSelectedDate((date) => addDays(date, -1))}
-                type="button"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-              <button
-                aria-label="Next day"
-                className="daily-planner__icon-button"
-                onClick={() => setSelectedDate((date) => addDays(date, 1))}
-                type="button"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-          </header>
+              <div className="daily-planner__toolbar-actions pomodoro__day-toolbar">
+                <button
+                  className="daily-planner__toolbar-button daily-planner__date-button"
+                  onClick={() => setSelectedDate(stripTime(new Date()))}
+                  type="button"
+                >
+                  {formatSelectedDateLabel(selectedDate)}
+                </button>
+
+                <div className="daily-planner__date-picker" ref={datePickerRef}>
+                  <button
+                    aria-label="Open calendar"
+                    className="daily-planner__toolbar-button"
+                    onClick={() => {
+                      setCalendarMonth(
+                        new Date(
+                          selectedDate.getFullYear(),
+                          selectedDate.getMonth(),
+                          1,
+                        ),
+                      )
+                      setIsCalendarOpen((current) => !current)
+                    }}
+                    type="button"
+                  >
+                    <CalendarDays className="size-4" />
+                  </button>
+
+                  {isCalendarOpen ? renderCalendarPopover() : null}
+                </div>
+
+                <button
+                  aria-label="Previous day"
+                  className="daily-planner__icon-button"
+                  onClick={() => setSelectedDate((date) => addDays(date, -1))}
+                  type="button"
+                >
+                  <ChevronLeft className="size-4" />
+                </button>
+                <button
+                  aria-label="Next day"
+                  className="daily-planner__icon-button"
+                  onClick={() => setSelectedDate((date) => addDays(date, 1))}
+                  type="button"
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+              </div>
+            </header>
+          )}
 
           <div className="daily-planner__day-body">
             {pendingTasks.length > 0 ? (

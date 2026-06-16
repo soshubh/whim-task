@@ -1,13 +1,15 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { PanelLeftIcon, Search, XIcon } from "lucide-react"
+import { Bell, CalendarDays, Home, Search, Sparkles } from "lucide-react"
 
 import { useAuth } from "@/components/auth-provider"
 import { AppSidebar, type ShellSection } from "@/components/app-sidebar"
 import { DailyPlannerView } from "@/components/daily-planner-view"
 import { HomeDashboard } from "@/components/home-dashboard"
+import { NotificationBadge } from "@/components/notification-badge"
 import { NotificationsLayer } from "@/components/notifications-layer"
 import { PlannerProvider } from "@/components/planner-provider"
 import { PomodoroView } from "@/components/pomodoro-view"
@@ -21,7 +23,11 @@ import {
   useSettings,
 } from "@/components/settings-provider"
 import { GET_STARTED_PATH } from "@/lib/app-meta"
-import { Button } from "@/components/ui/button"
+import {
+  readShellSectionFromLocation,
+  writeShellSectionToLocation,
+} from "@/lib/shell-navigation"
+import { cn } from "@/lib/utils"
 
 const sectionTitles: Record<ShellSection, string> = {
   home: "Home",
@@ -35,12 +41,30 @@ const sectionSearchPlaceholders: Record<ShellSection, string> = {
   "daily-planner": "Search your workspace",
 }
 
+const mobileNavItems: Array<{
+  key: ShellSection
+  label: string
+  icon: React.ReactNode
+}> = [
+  { key: "home", label: "Home", icon: <Home className="size-5" /> },
+  {
+    key: "pomodoro",
+    label: "Pomodoro",
+    icon: <Sparkles className="size-5" />,
+  },
+  {
+    key: "daily-planner",
+    label: "Daily Planner",
+    icon: <CalendarDays className="size-5" />,
+  },
+]
+
 function AppShell() {
   const router = useRouter()
   const { isAuthenticated, isLoading, signOut } = useAuth()
   const [activeSection, setActiveSection] =
     React.useState<ShellSection>("home")
-  const [isMobileOpen, setIsMobileOpen] = React.useState(false)
+  const [isSectionReady, setIsSectionReady] = React.useState(false)
   const {
     bellShaking,
     closeNotifications,
@@ -67,47 +91,119 @@ function AppShell() {
     })
   }, [closeNotifications, closeSettings, router, signOut])
 
+  const handleSectionChange = React.useCallback((section: ShellSection) => {
+    setActiveSection(section)
+    writeShellSectionToLocation(section)
+  }, [])
+
+  React.useEffect(() => {
+    if (isLoading) {
+      return
+    }
+
+    setActiveSection(readShellSectionFromLocation())
+    setIsSectionReady(true)
+  }, [isLoading])
+
+  React.useEffect(() => {
+    const handlePopState = () => {
+      setActiveSection(readShellSectionFromLocation())
+    }
+
+    window.addEventListener("popstate", handlePopState)
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState)
+    }
+  }, [])
+
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace(GET_STARTED_PATH)
     }
   }, [isAuthenticated, isLoading, router])
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || !isAuthenticated || !isSectionReady) {
     return null
   }
+
+  const profileInitial = (
+    settings.profile.name.trim()[0] ||
+    settings.profile.email.trim()[0] ||
+    "U"
+  ).toUpperCase()
 
   return (
     <>
       <AppSidebar
         activeSection={activeSection}
         bellShaking={bellShaking}
-        isMobileOpen={isMobileOpen}
+        isMobileOpen={false}
         notificationCount={notificationCount}
-        onCloseMobile={() => setIsMobileOpen(false)}
+        onCloseMobile={() => undefined}
         onOpenNotifications={handleOpenNotifications}
         onOpenSettings={handleOpenSettings}
         onLogout={handleLogout}
-        onSectionChange={setActiveSection}
+        onSectionChange={handleSectionChange}
         profile={settings.profile}
       />
 
       <main className="app-main">
         <div className="app-main__frame">
-          <div className="app-main__mobile-bar">
-            <Button
-              className="app-mobile-trigger"
-              onClick={() => setIsMobileOpen((open) => !open)}
-              size="icon"
-              variant="outline"
-            >
-              {isMobileOpen ? <XIcon /> : <PanelLeftIcon />}
-              <span className="sr-only">Toggle navigation</span>
-            </Button>
-            <span className="app-main__mobile-label">
-              {sectionTitles[activeSection]}
-            </span>
-          </div>
+          <header className="app-mobile-header">
+            <div className="app-mobile-header__brand">
+              <Image
+                alt="Whim Task logo"
+                className="app-mobile-header__logo"
+                height={40}
+                src="/Log.png"
+                width={40}
+              />
+              <div className="app-mobile-header__copy">
+                <h1 className="app-mobile-header__title">
+                  Hi, {settings.profile.name}!
+                </h1>
+                <p className="app-mobile-header__subtitle">
+                  {sectionTitles[activeSection]}
+                </p>
+              </div>
+            </div>
+
+            <div className="app-mobile-header__actions">
+              <button
+                aria-label="Notifications"
+                className={cn(
+                  "app-mobile-header__bell",
+                  bellShaking && "app-mobile-header__bell--shake",
+                )}
+                onClick={handleOpenNotifications}
+                type="button"
+              >
+                <Bell className="size-5" />
+                <NotificationBadge count={notificationCount} />
+              </button>
+
+              <button
+                aria-label="Open settings"
+                className="app-mobile-header__profile"
+                onClick={handleOpenSettings}
+                type="button"
+              >
+                {settings.profile.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    alt={settings.profile.name}
+                    className="app-mobile-header__avatar"
+                    src={settings.profile.avatar}
+                  />
+                ) : (
+                  <span className="app-mobile-header__avatar-fallback">
+                    {profileInitial}
+                  </span>
+                )}
+              </button>
+            </div>
+          </header>
 
           <header className="app-main__header">
             <div className="app-main__header-copy">
@@ -143,9 +239,30 @@ function AppShell() {
               {activeSection === "daily-planner" ? <DailyPlannerView /> : null}
             </div>
             <NotificationsLayer />
-            <SettingsLayer />
+            <SettingsLayer onLogout={handleLogout} />
           </div>
         </div>
+
+        <nav
+          aria-label="Primary navigation"
+          className="app-mobile-nav"
+        >
+          {mobileNavItems.map((item) => (
+            <button
+              aria-current={activeSection === item.key ? "page" : undefined}
+              aria-label={item.label}
+              className={cn(
+                "app-mobile-nav__item",
+                activeSection === item.key && "app-mobile-nav__item--active",
+              )}
+              key={item.key}
+              onClick={() => handleSectionChange(item.key)}
+              type="button"
+            >
+              {item.icon}
+            </button>
+          ))}
+        </nav>
       </main>
     </>
   )
