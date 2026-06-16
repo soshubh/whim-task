@@ -3095,10 +3095,7 @@
   height: 100%;
   flex: 1;
   gap: var(--space-4);
-  grid-template-columns: minmax(0, 1.7fr) minmax(
-      calc(300px * var(--ui-scale)),
-      0.8fr
-    );
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: stretch;
 }
 
@@ -4255,10 +4252,7 @@
   }
 
   .pomodoro__layout {
-    grid-template-columns: minmax(0, 1fr) minmax(
-        calc(260px * var(--ui-scale)),
-        0.72fr
-      );
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     min-height: calc(520px * var(--ui-scale));
     height: 100%;
   }
