@@ -1,5 +1,5 @@
 import type { CloudSnapshot } from "@/lib/cloud-store"
-import type { PlannerTask } from "@/lib/planner"
+import { countPlannerTasks, type PlannerTask } from "@/lib/planner"
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import {
   mapNotificationSettingsToRow,
@@ -113,57 +113,63 @@ export async function syncAppStateToDb(
     }
   }
 
-  for (const [dateKey, day] of Object.entries(snapshot.planner_state)) {
-    const { data: dayRow, error: dayError } = await supabase
-      .from("planner_days")
-      .upsert(
-        {
-          user_id: userId,
-          date_key: dateKey,
-          draft: "",
-          is_adding: false,
-          show_completed: day.showCompleted,
-        },
-        { onConflict: "user_id,date_key" },
-      )
-      .select("id, date_key")
-      .single()
+  const plannerTaskCount = countPlannerTasks(snapshot.planner_state)
 
-    if (dayError || !dayRow) {
-      throw new Error(dayError?.message || "Could not save planner day.")
-    }
+  if (plannerTaskCount > 0) {
+    for (const [dateKey, day] of Object.entries(snapshot.planner_state)) {
+      const { data: dayRow, error: dayError } = await supabase
+        .from("planner_days")
+        .upsert(
+          {
+            user_id: userId,
+            date_key: dateKey,
+            draft: "",
+            is_adding: false,
+            show_completed: day.showCompleted,
+          },
+          { onConflict: "user_id,date_key" },
+        )
+        .select("id, date_key")
+        .single()
 
-    let sortOrder = 0
-    const keepTaskIds = new Set<string>()
-    const dayTaskRows: ReturnType<typeof taskToRow>[] = []
+      if (dayError || !dayRow) {
+        throw new Error(dayError?.message || "Could not save planner day.")
+      }
 
-    for (const task of day.tasks) {
-      dayTaskRows.push(
-        taskToRow(userId, dayRow.id as string, task, "active", sortOrder),
-      )
-      keepTaskIds.add(task.id)
-      sortOrder += 1
-    }
+      let sortOrder = 0
+      const keepTaskIds = new Set<string>()
+      const dayTaskRows: ReturnType<typeof taskToRow>[] = []
 
-    for (const task of day.completed) {
-      dayTaskRows.push(
-        taskToRow(userId, dayRow.id as string, task, "completed", sortOrder),
-      )
-      keepTaskIds.add(task.id)
-      sortOrder += 1
-    }
+      for (const task of day.tasks) {
+        dayTaskRows.push(
+          taskToRow(userId, dayRow.id as string, task, "active", sortOrder),
+        )
+        keepTaskIds.add(task.id)
+        sortOrder += 1
+      }
 
-    if (dayTaskRows.length > 0) {
-      const { error } = await supabase.from("planner_tasks").upsert(dayTaskRows, {
-        onConflict: "id",
-      })
+      for (const task of day.completed) {
+        dayTaskRows.push(
+          taskToRow(userId, dayRow.id as string, task, "completed", sortOrder),
+        )
+        keepTaskIds.add(task.id)
+        sortOrder += 1
+      }
 
-      if (error) {
-        throw new Error(error.message)
+      if (dayTaskRows.length > 0) {
+        const { error } = await supabase.from("planner_tasks").upsert(dayTaskRows, {
+          onConflict: "id",
+        })
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      }
+
+      if (keepTaskIds.size > 0) {
+        await deleteTasksRemovedFromDay(dayRow.id as string, keepTaskIds)
       }
     }
-
-    await deleteTasksRemovedFromDay(dayRow.id as string, keepTaskIds)
   }
 
   const reminderRows = snapshot.reminders.map((reminder) => ({

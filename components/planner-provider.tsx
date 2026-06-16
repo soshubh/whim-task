@@ -29,7 +29,9 @@ import {
   type RoutineRule,
 } from "@/lib/planner"
 import {
+  APP_DATA_HYDRATED_EVENT,
   APP_DATA_SYNCED_EVENT,
+  getIsAppDataHydrated,
   schedulePushAppData,
 } from "@/lib/app-data-sync"
 
@@ -98,7 +100,23 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const [routines, setRoutines] = React.useState<RoutineRule[]>([])
   const [reminders, setReminders] = React.useState<Reminder[]>([])
   const [isStorageHydrated, setIsStorageHydrated] = React.useState(false)
+  const [isAppDataHydrated, setIsAppDataHydrated] = React.useState(() =>
+    getIsAppDataHydrated(),
+  )
   const [isPlannerReady, setIsPlannerReady] = React.useState(false)
+
+  React.useEffect(() => {
+    const syncHydration = () => {
+      setIsAppDataHydrated(getIsAppDataHydrated())
+    }
+
+    syncHydration()
+    window.addEventListener(APP_DATA_HYDRATED_EVENT, syncHydration)
+
+    return () => {
+      window.removeEventListener(APP_DATA_HYDRATED_EVENT, syncHydration)
+    }
+  }, [session?.userId])
 
   React.useEffect(() => {
     if (isLoading) {
@@ -146,32 +164,34 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session?.userId])
 
+  const canSync = session && isStorageHydrated && isAppDataHydrated
+
   React.useEffect(() => {
-    if (!session || !isStorageHydrated) {
+    if (!canSync) {
       return
     }
 
     patchCloudSnapshot({ planner_state: plannerState })
     schedulePushAppData()
-  }, [plannerState, session?.userId, isStorageHydrated])
+  }, [plannerState, canSync])
 
   React.useEffect(() => {
-    if (!session || !isStorageHydrated) {
+    if (!canSync) {
       return
     }
 
     patchCloudSnapshot({ routines })
     schedulePushAppData()
-  }, [routines, session?.userId, isStorageHydrated])
+  }, [routines, canSync])
 
   React.useEffect(() => {
-    if (!session || !isStorageHydrated) {
+    if (!canSync) {
       return
     }
 
     saveReminders(reminders)
     schedulePushAppData()
-  }, [reminders, session?.userId, isStorageHydrated])
+  }, [reminders, canSync])
 
   React.useEffect(() => {
     const refreshReminders = () => {
@@ -222,7 +242,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
           [dateKey]: updater(current[dateKey] ?? createEmptyDayState()),
         }
 
-        if (isStorageHydrated) {
+        if (canSync) {
           patchCloudSnapshot({ planner_state: nextState })
           schedulePushAppData()
         }
@@ -230,7 +250,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
         return nextState
       })
     },
-    [isStorageHydrated],
+    [canSync],
   )
 
   const upsertTaskReminder = React.useCallback(

@@ -22,6 +22,7 @@ import { usePlanner } from "@/components/planner-provider"
 import { useReminderUi } from "@/components/reminder-ui-provider"
 import { buildReminderPickerTarget } from "@/components/reminder-picker-modal"
 import { createDraftInputHandlers } from "@/lib/draft-input-handlers"
+import { deletePlannerTaskFromDb } from "@/lib/db/planner-mutations"
 
 type PlannerTask = {
   id: string
@@ -632,6 +633,7 @@ export function DailyPlannerView() {
         deleteRoutine(target.task.routineId)
       } else {
         removeRemindersForTask(target.task.id)
+        void deletePlannerTaskFromDb(target.task.id)
         removeTaskTarget(target)
       }
 

@@ -16,6 +16,7 @@ import {
   type PlannerTask,
 } from "@/lib/planner"
 import { createDraftInputHandlers } from "@/lib/draft-input-handlers"
+import { deletePlannerTaskFromDb } from "@/lib/db/planner-mutations"
 
 type EditingTaskState = {
   dateKey: string
@@ -200,6 +201,7 @@ export function TodayTasksPanel({
       )
     } else {
       removeRemindersForTask(task.id)
+      void deletePlannerTaskFromDb(task.id)
       updateDay(selectedDateKey, (day) => ({
         ...day,
         tasks: day.tasks.filter((entry) => entry.id !== task.id),

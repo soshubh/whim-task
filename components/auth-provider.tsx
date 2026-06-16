@@ -13,7 +13,7 @@ import {
 } from "@/lib/auth"
 import { formatAuthError } from "@/lib/auth-errors"
 import { clearCloudSnapshot } from "@/lib/cloud-store"
-import { syncAppDataFromRemote } from "@/lib/app-data-sync"
+import { resetAppDataHydration, syncAppDataFromRemote } from "@/lib/app-data-sync"
 import {
   loadSettings,
   saveSettings,
@@ -84,6 +84,7 @@ function shouldSyncProfileFromAuthEvent(event: string) {
 function clearAuthenticatedStorageScope() {
   setActiveUserId(null)
   clearCloudSnapshot()
+  resetAppDataHydration()
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

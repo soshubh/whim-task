@@ -53,6 +53,10 @@ export function getIsAppDataHydrated() {
   return isAppDataHydrated
 }
 
+export function resetAppDataHydration() {
+  setAppDataHydrated(false)
+}
+
 function setAppDataHydrated(hydrated: boolean) {
   isAppDataHydrated = hydrated
 
@@ -154,7 +158,7 @@ async function pushCloudSnapshotToDb(userId: string, snapshot: UserSyncSnapshot)
 export async function flushPushAppData() {
   const userId = getActiveUserId()
 
-  if (!userId || isApplyingRemote) {
+  if (!userId || isApplyingRemote || !isAppDataHydrated) {
     return
   }
 
@@ -310,7 +314,7 @@ export async function syncAppDataFromRemote(
 }
 
 export function schedulePushAppData() {
-  if (isApplyingRemote || typeof window === "undefined") {
+  if (isApplyingRemote || typeof window === "undefined" || !isAppDataHydrated) {
     return
   }
 
