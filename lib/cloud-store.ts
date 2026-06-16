@@ -38,17 +38,36 @@ const LEGACY_KEYS = {
 } as const
 
 let memorySnapshot: CloudSnapshot | null = null
+let localEditGeneration = 0
+let lastPushCompletedGeneration = 0
 
 export function getCloudSnapshot() {
   return memorySnapshot
 }
 
-export function setCloudSnapshot(snapshot: CloudSnapshot) {
+export function setCloudSnapshot(
+  snapshot: CloudSnapshot,
+  options?: { fromRemote?: boolean },
+) {
   memorySnapshot = snapshot
+
+  if (options?.fromRemote) {
+    lastPushCompletedGeneration = localEditGeneration
+  }
 }
 
 export function clearCloudSnapshot() {
   memorySnapshot = null
+  localEditGeneration = 0
+  lastPushCompletedGeneration = 0
+}
+
+export function hasPendingLocalChanges() {
+  return localEditGeneration > lastPushCompletedGeneration
+}
+
+export function markPushCompleted() {
+  lastPushCompletedGeneration = localEditGeneration
 }
 
 export function createEmptyCloudSnapshot(
@@ -67,9 +86,16 @@ export function createEmptyCloudSnapshot(
   }
 }
 
-export function patchCloudSnapshot(patch: Partial<CloudSnapshot>): CloudSnapshot {
+export function patchCloudSnapshot(
+  patch: Partial<CloudSnapshot>,
+  options?: { skipLocalBump?: boolean },
+): CloudSnapshot {
   const current = memorySnapshot ?? createEmptyCloudSnapshot()
   const appSettings = patch.app_settings ?? current.app_settings
+
+  if (!options?.skipLocalBump) {
+    localEditGeneration += 1
+  }
 
   memorySnapshot = {
     ...current,

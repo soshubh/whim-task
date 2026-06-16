@@ -90,8 +90,8 @@ export async function syncAppStateToDb(
         {
           user_id: userId,
           date_key: dateKey,
-          draft: day.draft,
-          is_adding: day.isAdding,
+          draft: "",
+          is_adding: false,
           show_completed: day.showCompleted,
         },
         { onConflict: "user_id,date_key" },

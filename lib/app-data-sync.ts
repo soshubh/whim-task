@@ -2,7 +2,9 @@ import {
   clearLegacyAppLocalStorage,
   createEmptyCloudSnapshot,
   getCloudSnapshot,
+  hasPendingLocalChanges,
   importLegacyLocalStorage,
+  markPushCompleted,
   setCloudSnapshot,
   type CloudSnapshot,
 } from "@/lib/cloud-store"
@@ -23,9 +25,10 @@ import {
 import { getActiveUserId } from "@/lib/user-storage"
 
 export const APP_DATA_SYNCED_EVENT = "whim-app-data-synced"
+export const APP_DATA_HYDRATED_EVENT = "whim-app-data-hydrated"
 
-const PUSH_DEBOUNCE_MS = 200
-const REMOTE_REFRESH_DEBOUNCE_MS = 150
+const PUSH_DEBOUNCE_MS = 400
+const REMOTE_REFRESH_DEBOUNCE_MS = 250
 
 export type UserSyncSnapshot = CloudSnapshot
 
@@ -34,7 +37,7 @@ let pushDebounceId: number | null = null
 let pushInFlight: Promise<void> | null = null
 let remoteRefreshDebounceId: number | null = null
 let remoteRefreshInFlight: Promise<void> | null = null
-let lastPushedUpdatedAt: string | null = null
+let isAppDataHydrated = false
 
 function hasPlannerContent(state: Record<string, PlannerDayState>) {
   return Object.values(state).some(
@@ -42,6 +45,24 @@ function hasPlannerContent(state: Record<string, PlannerDayState>) {
       day.tasks.length > 0 ||
       day.completed.length > 0 ||
       day.draft.trim().length > 0,
+  )
+}
+
+export function getIsAppDataHydrated() {
+  return isAppDataHydrated
+}
+
+function setAppDataHydrated(hydrated: boolean) {
+  isAppDataHydrated = hydrated
+
+  if (typeof window === "undefined") {
+    return
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(APP_DATA_HYDRATED_EVENT, {
+      detail: { hydrated },
+    }),
   )
 }
 
@@ -87,10 +108,14 @@ export function applyCloudSnapshot(snapshot: UserSyncSnapshot) {
     return
   }
 
+  if (hasPendingLocalChanges()) {
+    return
+  }
+
   isApplyingRemote = true
 
   try {
-    setCloudSnapshot(snapshot)
+    setCloudSnapshot(snapshot, { fromRemote: true })
     window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT))
   } finally {
     isApplyingRemote = false
@@ -102,7 +127,7 @@ export function applyCloudSnapshot(snapshot: UserSyncSnapshot) {
 async function pushCloudSnapshotToDb(userId: string, snapshot: UserSyncSnapshot) {
   const updatedAt = await syncAppStateToDb(userId, snapshot)
   setCloudSnapshot({ ...snapshot, updated_at: updatedAt })
-  lastPushedUpdatedAt = updatedAt
+  markPushCompleted()
 }
 
 export async function flushPushAppData() {
@@ -138,7 +163,12 @@ export async function flushPushAppData() {
 }
 
 export async function refreshAppStateFromDb(userId: string) {
-  if (isApplyingRemote || pushDebounceId !== null || pushInFlight) {
+  if (
+    isApplyingRemote ||
+    pushDebounceId !== null ||
+    pushInFlight ||
+    hasPendingLocalChanges()
+  ) {
     return
   }
 
@@ -162,7 +192,7 @@ function scheduleRemoteRefresh(userId: string) {
     return
   }
 
-  if (pushDebounceId !== null || pushInFlight) {
+  if (pushDebounceId !== null || pushInFlight || hasPendingLocalChanges()) {
     return
   }
 
@@ -187,47 +217,62 @@ function scheduleRemoteRefresh(userId: string) {
   }, REMOTE_REFRESH_DEBOUNCE_MS)
 }
 
-export async function syncAppDataFromRemote(userId: string) {
-  if (pushDebounceId !== null || pushInFlight) {
-    await flushPushAppData()
+export async function syncAppDataFromRemote(
+  userId: string,
+  options?: { isInitial?: boolean },
+) {
+  if (options?.isInitial) {
+    setAppDataHydrated(false)
   }
 
-  const remoteSnapshot = await loadAppStateFromDb(userId)
-  const memorySnapshot = getCloudSnapshot()
-
-  if (!remoteSnapshot || !appStateHasRows(remoteSnapshot)) {
-    const legacySnapshot = importLegacyLocalStorage(userId)
-    const snapshot =
-      legacySnapshot ??
-      memorySnapshot ??
-      createEmptyCloudSnapshot(loadSettings() ?? DEFAULT_SETTINGS)
-
-    applyCloudSnapshot(snapshot)
-
-    if (snapshotHasData(snapshot)) {
-      await pushCloudSnapshotToDb(userId, collectCloudSnapshot())
+  try {
+    if (pushDebounceId !== null || pushInFlight) {
+      await flushPushAppData()
     }
 
-    if (legacySnapshot) {
-      clearLegacyAppLocalStorage(userId)
+    const remoteSnapshot = await loadAppStateFromDb(userId)
+    const memorySnapshot = getCloudSnapshot()
+
+    if (!remoteSnapshot || !appStateHasRows(remoteSnapshot)) {
+      const legacySnapshot = importLegacyLocalStorage(userId)
+      const snapshot =
+        legacySnapshot ??
+        memorySnapshot ??
+        createEmptyCloudSnapshot(loadSettings() ?? DEFAULT_SETTINGS)
+
+      setCloudSnapshot(snapshot)
+      window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT))
+      window.dispatchEvent(new CustomEvent(APP_DATA_SYNCED_EVENT))
+
+      if (snapshotHasData(snapshot)) {
+        await pushCloudSnapshotToDb(userId, collectCloudSnapshot())
+      }
+
+      if (legacySnapshot) {
+        clearLegacyAppLocalStorage(userId)
+      }
+
+      return
     }
 
-    return
+    const memoryTime = Date.parse(memorySnapshot?.updated_at || "0")
+    const remoteTime = Date.parse(remoteSnapshot.updated_at || "0")
+    const memoryHasData = memorySnapshot ? snapshotHasData(memorySnapshot) : false
+
+    if (!memorySnapshot || remoteTime >= memoryTime) {
+      applyCloudSnapshot(remoteSnapshot)
+    } else if (memoryHasData) {
+      await pushCloudSnapshotToDb(userId, memorySnapshot)
+    } else {
+      applyCloudSnapshot(remoteSnapshot)
+    }
+
+    clearLegacyAppLocalStorage(userId)
+  } finally {
+    if (options?.isInitial) {
+      setAppDataHydrated(true)
+    }
   }
-
-  const memoryTime = Date.parse(memorySnapshot?.updated_at || "0")
-  const remoteTime = Date.parse(remoteSnapshot.updated_at || "0")
-  const memoryHasData = memorySnapshot ? snapshotHasData(memorySnapshot) : false
-
-  if (!memorySnapshot || remoteTime >= memoryTime) {
-    applyCloudSnapshot(remoteSnapshot)
-  } else if (memoryHasData) {
-    await pushCloudSnapshotToDb(userId, memorySnapshot)
-  } else {
-    applyCloudSnapshot(remoteSnapshot)
-  }
-
-  clearLegacyAppLocalStorage(userId)
 }
 
 export function schedulePushAppData() {
@@ -268,7 +313,6 @@ export function subscribeToRemoteAppState(
   })
 }
 
-// Backward-compatible exports used by older imports
 export type UserSyncSnapshotRow = {
   app_settings: AppSettings | null
   daily_update_marker: string | null
@@ -297,6 +341,9 @@ export function subscribeToRemoteSnapshot(
   onUpdate: (row: UserSyncSnapshotRow) => void,
 ) {
   return subscribeToRemoteAppState(userId, () => {
-    onUpdate({ user_id: userId, updated_at: new Date().toISOString() } as UserSyncSnapshotRow)
+    onUpdate({
+      user_id: userId,
+      updated_at: new Date().toISOString(),
+    } as UserSyncSnapshotRow)
   })
 }

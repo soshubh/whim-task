@@ -15,6 +15,7 @@ import {
   toDateKey,
   type PlannerTask,
 } from "@/lib/planner"
+import { createDraftInputHandlers } from "@/lib/draft-input-handlers"
 
 type EditingTaskState = {
   dateKey: string
@@ -49,6 +50,7 @@ export function TodayTasksPanel({
   const [editingTask, setEditingTask] = React.useState<EditingTaskState | null>(
     null,
   )
+  const skipDraftBlurRef = React.useRef<string | null>(null)
 
   const dayState =
     plannerState[selectedDateKey] ?? {
@@ -345,24 +347,14 @@ export function TodayTasksPanel({
           <input
             autoFocus
             className="daily-planner__task-input"
-            onBlur={() => {
-              if (dayState.draft.trim()) {
-                handleDraftSubmit()
-                return
-              }
-
-              handleDraftCancel()
-            }}
+            {...createDraftInputHandlers({
+              id: selectedDateKey,
+              draft: dayState.draft,
+              skipBlurRef: skipDraftBlurRef,
+              onSubmit: handleDraftSubmit,
+              onCancel: handleDraftCancel,
+            })}
             onChange={(event) => handleDraftChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                handleDraftSubmit()
-              }
-
-              if (event.key === "Escape") {
-                handleDraftCancel()
-              }
-            }}
             placeholder="Type a task and press Enter"
             value={dayState.draft}
           />

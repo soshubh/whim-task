@@ -21,6 +21,7 @@ import { TaskRow, type TaskRowAction } from "./task-row"
 import { usePlanner } from "@/components/planner-provider"
 import { useReminderUi } from "@/components/reminder-ui-provider"
 import { buildReminderPickerTarget } from "@/components/reminder-picker-modal"
+import { createDraftInputHandlers } from "@/lib/draft-input-handlers"
 
 type PlannerTask = {
   id: string
@@ -224,6 +225,7 @@ export function DailyPlannerView() {
   const moveMenuRef = React.useRef<HTMLDivElement | null>(null)
   const taskDumpScheduleMenuRef = React.useRef<HTMLDivElement | null>(null)
   const datePickerRef = React.useRef<HTMLDivElement | null>(null)
+  const skipDraftBlurRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
     setIsMounted(true)
@@ -1379,26 +1381,16 @@ export function DailyPlannerView() {
                       <input
                         autoFocus
                         className="daily-planner__task-input"
-                        onBlur={() => {
-                          if (dayState.draft.trim()) {
-                            handleDraftSubmit(day.key)
-                            return
-                          }
-
-                          handleDraftCancel(day.key)
-                        }}
+                        {...createDraftInputHandlers({
+                          id: day.key,
+                          draft: dayState.draft,
+                          skipBlurRef: skipDraftBlurRef,
+                          onSubmit: () => handleDraftSubmit(day.key),
+                          onCancel: () => handleDraftCancel(day.key),
+                        })}
                         onChange={(event) =>
                           handleDraftChange(day.key, event.target.value)
                         }
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            handleDraftSubmit(day.key)
-                          }
-
-                          if (event.key === "Escape") {
-                            handleDraftCancel(day.key)
-                          }
-                        }}
                         placeholder="Type a task and press Enter"
                         value={dayState.draft}
                       />
@@ -1660,37 +1652,24 @@ export function DailyPlannerView() {
                   <input
                     autoFocus
                     className="daily-planner__task-input"
-                    onBlur={() => {
-                      if (taskDumpState.draft.trim()) {
-                        addTaskDumpItem()
-                        return
-                      }
-
-                    updateTaskDump((current) => ({
-                      ...current,
-                      draft: "",
-                      isAdding: false,
-                    }))
-                    }}
+                    {...createDraftInputHandlers({
+                      id: "task-dump",
+                      draft: taskDumpState.draft,
+                      skipBlurRef: skipDraftBlurRef,
+                      onSubmit: addTaskDumpItem,
+                      onCancel: () =>
+                        updateTaskDump((current) => ({
+                          ...current,
+                          draft: "",
+                          isAdding: false,
+                        })),
+                    })}
                     onChange={(event) =>
                       updateTaskDump((current) => ({
                         ...current,
                         draft: event.target.value,
                       }))
                     }
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        addTaskDumpItem()
-                      }
-
-                      if (event.key === "Escape") {
-                        updateTaskDump((current) => ({
-                          ...current,
-                          draft: "",
-                          isAdding: false,
-                        }))
-                      }
-                    }}
                     placeholder="Enter a task and press Enter"
                     value={taskDumpState.draft}
                   />

@@ -34,6 +34,7 @@ import {
 
 type PlannerContextValue = {
   dismissReminder: (reminderId: string) => void
+  isPlannerReady: boolean
   notificationCount: number
   notifications: NotificationItem[]
   plannerState: Record<string, PlannerDayState>
@@ -81,6 +82,21 @@ function loadRoutines() {
   return getCloudSnapshot()?.routines ?? []
 }
 
+function mergePlannerStateFromRemote(
+  local: Record<string, PlannerDayState>,
+  remote: Record<string, PlannerDayState>,
+) {
+  const merged: Record<string, PlannerDayState> = { ...remote }
+
+  for (const [dateKey, localDay] of Object.entries(local)) {
+    if (localDay.isAdding) {
+      merged[dateKey] = localDay
+    }
+  }
+
+  return merged
+}
+
 export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const { isLoading, session } = useAuth()
   const [plannerState, setPlannerState] = React.useState(() =>
@@ -89,14 +105,17 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   const [routines, setRoutines] = React.useState<RoutineRule[]>([])
   const [reminders, setReminders] = React.useState<Reminder[]>([])
   const [isStorageHydrated, setIsStorageHydrated] = React.useState(false)
+  const [isPlannerReady, setIsPlannerReady] = React.useState(false)
 
   React.useEffect(() => {
     if (isLoading) {
+      setIsPlannerReady(false)
       return
     }
 
     if (!session) {
       setIsStorageHydrated(false)
+      setIsPlannerReady(false)
       setPlannerState(createInitialPlannerState())
       setRoutines([])
       setReminders([])
@@ -107,10 +126,11 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     setRoutines(loadRoutines())
     setReminders(loadReminders())
     setIsStorageHydrated(true)
+    setIsPlannerReady(true)
   }, [isLoading, session?.userId])
 
   React.useEffect(() => {
-    const refreshFromStorage = () => {
+    const refreshFromCloud = () => {
       if (!session) {
         setPlannerState(createInitialPlannerState())
         setRoutines([])
@@ -118,15 +138,18 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      setPlannerState(loadPlannerState())
+      const remotePlanner = loadPlannerState()
+      setPlannerState((current) =>
+        mergePlannerStateFromRemote(current, remotePlanner),
+      )
       setRoutines(loadRoutines())
       setReminders(loadReminders())
     }
 
-    window.addEventListener(APP_DATA_SYNCED_EVENT, refreshFromStorage)
+    window.addEventListener(APP_DATA_SYNCED_EVENT, refreshFromCloud)
 
     return () => {
-      window.removeEventListener(APP_DATA_SYNCED_EVENT, refreshFromStorage)
+      window.removeEventListener(APP_DATA_SYNCED_EVENT, refreshFromCloud)
     }
   }, [session?.userId])
 
@@ -332,6 +355,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       reminders,
       notifications,
       notificationCount,
+      isPlannerReady,
       setPlannerState,
       setRoutines,
       updateDay,
@@ -348,6 +372,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       reminders,
       notifications,
       notificationCount,
+      isPlannerReady,
       updateDay,
       upsertTaskReminder,
       upsertRoutineReminder,

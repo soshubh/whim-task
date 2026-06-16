@@ -49,6 +49,7 @@ import {
   loadFocusSessionCount,
 } from "@/lib/pomodoro-sessions"
 import { APP_DATA_SYNCED_EVENT } from "@/lib/app-data-sync"
+import { createDraftInputHandlers } from "@/lib/draft-input-handlers"
 import {
   addDays,
   buildCalendarDays,
@@ -163,6 +164,7 @@ export function PomodoroView() {
   const [isFullscreen, setIsFullscreen] = React.useState(false)
   const timerPanelRef = React.useRef<HTMLDivElement>(null)
   const datePickerRef = React.useRef<HTMLDivElement>(null)
+  const skipDraftBlurRef = React.useRef<string | null>(null)
 
   const selectedDateKey = toDateKey(selectedDate)
   const isToday = isTodayDate(selectedDate)
@@ -1058,24 +1060,14 @@ export function PomodoroView() {
               <input
                 autoFocus
                 className="daily-planner__task-input"
-                onBlur={() => {
-                  if (dayState.draft.trim()) {
-                    handleDraftSubmit()
-                    return
-                  }
-
-                  handleDraftCancel()
-                }}
+                {...createDraftInputHandlers({
+                  id: selectedDateKey,
+                  draft: dayState.draft,
+                  skipBlurRef: skipDraftBlurRef,
+                  onSubmit: handleDraftSubmit,
+                  onCancel: handleDraftCancel,
+                })}
                 onChange={(event) => handleDraftChange(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    handleDraftSubmit()
-                  }
-
-                  if (event.key === "Escape") {
-                    handleDraftCancel()
-                  }
-                }}
                 placeholder="Type a task and press Enter"
                 value={dayState.draft}
               />

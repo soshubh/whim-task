@@ -5,6 +5,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Bell, CalendarDays, Home, Search, Sparkles } from "lucide-react"
 
+import { AppDataLoadingOverlay } from "@/components/app-data-loading-overlay"
 import { useAuth } from "@/components/auth-provider"
 import { AppSidebar, type ShellSection } from "@/components/app-sidebar"
 import { DailyPlannerView } from "@/components/daily-planner-view"
@@ -272,6 +273,7 @@ export default function Page() {
   return (
     <div className="app-body">
       <PlannerProvider>
+        <AppDataLoadingOverlay />
         <SettingsProvider>
           <ReminderUiProvider>
             <AppShell />

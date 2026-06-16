@@ -74,7 +74,7 @@ async function syncProfileFromSession(session: AuthSession) {
 
   saveSettings(next, { skipCloudSync: true })
 
-  await syncAppDataFromRemote(session.userId)
+  await syncAppDataFromRemote(session.userId, { isInitial: true })
 }
 
 function shouldSyncProfileFromAuthEvent(event: string) {

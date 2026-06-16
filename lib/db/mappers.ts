@@ -203,8 +203,8 @@ export function buildPlannerStateFromRows(
   for (const day of days) {
     plannerState[day.date_key] = {
       ...createEmptyDayState(),
-      draft: day.draft,
-      isAdding: day.is_adding,
+      draft: "",
+      isAdding: false,
       showCompleted: day.show_completed,
     }
   }
