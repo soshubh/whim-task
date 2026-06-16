@@ -27,6 +27,10 @@ import {
   readScopedJson,
   writeScopedJson,
 } from "@/lib/user-storage"
+import {
+  APP_DATA_SYNCED_EVENT,
+  schedulePushAppData,
+} from "@/lib/app-data-sync"
 
 const STORAGE_KEY = "whim-task-planner-state"
 const ROUTINES_KEY = "whim-task-routines"
@@ -125,11 +129,33 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   }, [isLoading, session?.userId])
 
   React.useEffect(() => {
+    const refreshFromStorage = () => {
+      if (!session) {
+        setPlannerState(createInitialPlannerState())
+        setRoutines([])
+        setReminders([])
+        return
+      }
+
+      setPlannerState(loadPlannerState())
+      setRoutines(loadRoutines())
+      setReminders(loadReminders())
+    }
+
+    window.addEventListener(APP_DATA_SYNCED_EVENT, refreshFromStorage)
+
+    return () => {
+      window.removeEventListener(APP_DATA_SYNCED_EVENT, refreshFromStorage)
+    }
+  }, [session?.userId])
+
+  React.useEffect(() => {
     if (!session) {
       return
     }
 
     writeScopedJson(STORAGE_KEY, plannerState)
+    schedulePushAppData()
   }, [plannerState, session?.userId])
 
   React.useEffect(() => {
@@ -138,6 +164,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     }
 
     writeScopedJson(ROUTINES_KEY, routines)
+    schedulePushAppData()
   }, [routines, session?.userId])
 
   React.useEffect(() => {
@@ -146,6 +173,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     }
 
     saveReminders(reminders)
+    schedulePushAppData()
   }, [reminders, session?.userId])
 
   React.useEffect(() => {

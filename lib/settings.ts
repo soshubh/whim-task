@@ -97,6 +97,12 @@ export function saveSettings(settings: AppSettings) {
 
   writeScopedJson(SETTINGS_STORAGE_KEY, settings)
   window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT))
+
+  import("@/lib/app-data-sync")
+    .then(({ schedulePushAppData }) => {
+      schedulePushAppData()
+    })
+    .catch(() => undefined)
 }
 
 export function areSettingsEqual(left: AppSettings, right: AppSettings) {

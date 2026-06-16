@@ -3,6 +3,7 @@ import {
   readScopedItem,
   writeScopedItem,
 } from "@/lib/user-storage"
+import { schedulePushAppData } from "@/lib/app-data-sync"
 
 export type PomodoroSessionLog = {
   durationSeconds: number
@@ -65,6 +66,7 @@ export function savePomodoroSessionLogs(
       detail: { dateKey },
     }),
   )
+  schedulePushAppData()
 }
 
 export function getElapsedFocusSeconds(

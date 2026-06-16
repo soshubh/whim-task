@@ -46,9 +46,9 @@ import {
 import {
   addPomodoroSessionLog,
   getElapsedFocusSeconds,
-  getFocusSessionsStorageKey,
   loadFocusSessionCount,
 } from "@/lib/pomodoro-sessions"
+import { APP_DATA_SYNCED_EVENT } from "@/lib/app-data-sync"
 import {
   addDays,
   buildCalendarDays,
@@ -78,10 +78,6 @@ function formatTimer(seconds: number) {
   const minutes = Math.floor(seconds / 60)
   const remainder = seconds % 60
   return `${minutes}:${`${remainder}`.padStart(2, "0")}`
-}
-
-function getSessionsStorageKey() {
-  return getFocusSessionsStorageKey(toDateKey(new Date()))
 }
 
 type EditingTaskState = {
@@ -257,15 +253,18 @@ export function PomodoroView() {
   }, [])
 
   React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return
+    const refreshPomodoroData = () => {
+      const storedDefaults = loadPomodoroTimerDefaults()
+      setTimerDefaults(storedDefaults)
+      setSessionsToday(loadFocusSessionCount(toDateKey(new Date())))
     }
 
-    window.localStorage.setItem(
-      getSessionsStorageKey(),
-      `${sessionsToday}`,
-    )
-  }, [sessionsToday])
+    window.addEventListener(APP_DATA_SYNCED_EVENT, refreshPomodoroData)
+
+    return () => {
+      window.removeEventListener(APP_DATA_SYNCED_EVENT, refreshPomodoroData)
+    }
+  }, [])
 
   React.useEffect(() => {
     if (!focusedTaskId) {

@@ -12,6 +12,7 @@ import {
   type AuthSession,
 } from "@/lib/auth"
 import { formatAuthError } from "@/lib/auth-errors"
+import { syncAppDataFromRemote } from "@/lib/app-data-sync"
 import {
   loadSettings,
   saveSettings,
@@ -75,6 +76,8 @@ async function syncProfileFromSession(session: AuthSession) {
   }
 
   saveSettings(next)
+
+  await syncAppDataFromRemote(session.userId)
 }
 
 function shouldSyncProfileFromAuthEvent(event: string) {

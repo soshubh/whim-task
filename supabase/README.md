@@ -11,6 +11,7 @@
 | Reminders | `reminders` |
 | Pomodoro | `pomodoro_timer_settings`, `pomodoro_sessions` |
 | Daily updates | `daily_update_logs` |
+| Cross-device sync | `user_sync_snapshots` |
 | Gmail OTP (Brevo) | `otp_codes` (service-role only) |
 
 ## Apply the SQL
@@ -79,6 +80,8 @@ Run migrations in order:
 
 1. `20250615000000_initial_schema.sql`
 2. `20250615000003_allow_any_email_domain.sql`
+3. `20250616000000_user_sync_snapshots.sql`
+4. `20250616000001_user_sync_app_settings.sql`
 
 Skip `20250615000002_gmail_only.sql` unless you want Gmail-only.
 

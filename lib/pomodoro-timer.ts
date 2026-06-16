@@ -2,6 +2,7 @@ import {
   readScopedJson,
   writeScopedJson,
 } from "@/lib/user-storage"
+import { schedulePushAppData } from "@/lib/app-data-sync"
 
 export type PomodoroTimerMode = "focus" | "short-break" | "long-break"
 
@@ -57,6 +58,7 @@ export function savePomodoroTimerDefaults(defaults: PomodoroTimerDefaults) {
   }
 
   writeScopedJson(STORAGE_KEY, defaults)
+  schedulePushAppData()
 }
 
 export function minutesToSeconds(minutes: number) {

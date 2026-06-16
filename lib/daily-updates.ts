@@ -13,6 +13,7 @@ import {
   readScopedItem,
   writeScopedItem,
 } from "@/lib/user-storage"
+import { schedulePushAppData } from "@/lib/app-data-sync"
 
 export type DailyTaskSummary = {
   added: number
@@ -102,6 +103,7 @@ export function markDailyUpdateFired(
 
   const dateKey = toDateKey(stripTime(referenceDate))
   writeScopedItem(LAST_DAILY_UPDATE_KEY, `${dateKey}:${slot}`)
+  schedulePushAppData()
 }
 
 export function getActiveDailyUpdateSlot(
