@@ -99,7 +99,7 @@ export function saveSettings(
   patchCloudSnapshot({
     app_settings: settings,
     notification_settings: settings.notifications,
-  })
+  }, { skipLocalBump: options?.skipCloudSync })
   window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT))
 
   if (options?.skipCloudSync) {
