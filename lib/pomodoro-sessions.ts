@@ -1,8 +1,5 @@
+import { getCloudSnapshot, patchCloudSnapshot } from "@/lib/cloud-store"
 import { DEFAULT_POMODORO_TIMER_VALUES } from "@/lib/pomodoro-timer"
-import {
-  readScopedItem,
-  writeScopedItem,
-} from "@/lib/user-storage"
 import { schedulePushAppData } from "@/lib/app-data-sync"
 
 export type PomodoroSessionLog = {
@@ -21,34 +18,20 @@ export function getPomodoroSessionLogKey(dateKey: string) {
 }
 
 export function loadPomodoroSessionLogs(dateKey: string): PomodoroSessionLog[] {
-  if (typeof window === "undefined") {
+  const logs = getCloudSnapshot()?.pomodoro_sessions_by_date[dateKey]
+
+  if (!logs) {
     return []
   }
 
-  try {
-    const stored = readScopedItem(getPomodoroSessionLogKey(dateKey))
-
-    if (!stored) {
-      return []
-    }
-
-    const parsed = JSON.parse(stored) as PomodoroSessionLog[]
-
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-
-    return parsed.filter(
-      (entry) =>
-        entry &&
-        typeof entry.id === "string" &&
-        typeof entry.taskId === "string" &&
-        typeof entry.taskTitle === "string" &&
-        typeof entry.durationSeconds === "number",
-    )
-  } catch {
-    return []
-  }
+  return logs.filter(
+    (entry) =>
+      entry &&
+      typeof entry.id === "string" &&
+      typeof entry.taskId === "string" &&
+      typeof entry.taskTitle === "string" &&
+      typeof entry.durationSeconds === "number",
+  )
 }
 
 export function savePomodoroSessionLogs(
@@ -59,8 +42,14 @@ export function savePomodoroSessionLogs(
     return
   }
 
-  writeScopedItem(getPomodoroSessionLogKey(dateKey), JSON.stringify(logs))
-  writeScopedItem(getFocusSessionsStorageKey(dateKey), `${logs.length}`)
+  const currentSessions = getCloudSnapshot()?.pomodoro_sessions_by_date ?? {}
+
+  patchCloudSnapshot({
+    pomodoro_sessions_by_date: {
+      ...currentSessions,
+      [dateKey]: logs,
+    },
+  })
   window.dispatchEvent(
     new CustomEvent("whim-pomodoro-sessions-updated", {
       detail: { dateKey },
@@ -97,12 +86,7 @@ export function addPomodoroSessionLog(
 }
 
 export function loadFocusSessionCount(dateKey: string) {
-  if (typeof window === "undefined") {
-    return 0
-  }
-
-  const stored = readScopedItem(getFocusSessionsStorageKey(dateKey))
-  return stored ? Number.parseInt(stored, 10) || 0 : 0
+  return loadPomodoroSessionLogs(dateKey).length
 }
 
 export function getTotalFocusSeconds(

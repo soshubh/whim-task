@@ -18,22 +18,19 @@ import {
   type TaskReminder,
 } from "@/lib/reminders"
 import {
+  getCloudSnapshot,
+  patchCloudSnapshot,
+} from "@/lib/cloud-store"
+import {
   createInitialPlannerState,
   createEmptyDayState,
   type PlannerDayState,
   type RoutineRule,
 } from "@/lib/planner"
 import {
-  readScopedJson,
-  writeScopedJson,
-} from "@/lib/user-storage"
-import {
   APP_DATA_SYNCED_EVENT,
   schedulePushAppData,
 } from "@/lib/app-data-sync"
-
-const STORAGE_KEY = "whim-task-planner-state"
-const ROUTINES_KEY = "whim-task-routines"
 
 type PlannerContextValue = {
   dismissReminder: (reminderId: string) => void
@@ -71,36 +68,17 @@ type PlannerContextValue = {
 const PlannerContext = React.createContext<PlannerContextValue | null>(null)
 
 function loadPlannerState() {
-  if (typeof window === "undefined") {
+  const stored = getCloudSnapshot()?.planner_state
+
+  if (!stored || Object.keys(stored).length === 0) {
     return createInitialPlannerState()
   }
 
-  try {
-    const stored = readScopedJson<Record<string, PlannerDayState>>(
-      STORAGE_KEY,
-      {},
-    )
-
-    if (!stored || Object.keys(stored).length === 0) {
-      return createInitialPlannerState()
-    }
-
-    return stored
-  } catch {
-    return createInitialPlannerState()
-  }
+  return stored
 }
 
 function loadRoutines() {
-  if (typeof window === "undefined") {
-    return []
-  }
-
-  try {
-    return readScopedJson<RoutineRule[]>(ROUTINES_KEY, [])
-  } catch {
-    return []
-  }
+  return getCloudSnapshot()?.routines ?? []
 }
 
 export function PlannerProvider({ children }: { children: React.ReactNode }) {
@@ -157,7 +135,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    writeScopedJson(STORAGE_KEY, plannerState)
+    patchCloudSnapshot({ planner_state: plannerState })
     schedulePushAppData()
   }, [plannerState, session?.userId, isStorageHydrated])
 
@@ -166,7 +144,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    writeScopedJson(ROUTINES_KEY, routines)
+    patchCloudSnapshot({ routines })
     schedulePushAppData()
   }, [routines, session?.userId, isStorageHydrated])
 

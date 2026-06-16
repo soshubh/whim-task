@@ -12,6 +12,7 @@ import {
   type AuthSession,
 } from "@/lib/auth"
 import { formatAuthError } from "@/lib/auth-errors"
+import { clearCloudSnapshot } from "@/lib/cloud-store"
 import { syncAppDataFromRemote } from "@/lib/app-data-sync"
 import {
   loadSettings,
@@ -20,10 +21,7 @@ import {
 } from "@/lib/settings"
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { fetchRemoteProfile } from "@/lib/profile-sync"
-import {
-  migrateLegacyStorageForUser,
-  setActiveUserId,
-} from "@/lib/user-storage"
+import { setActiveUserId } from "@/lib/user-storage"
 
 type AuthContextValue = {
   configError: string | null
@@ -56,7 +54,6 @@ async function syncProfileFromSession(session: AuthSession) {
   const syncId = ++profileSyncGeneration
 
   setActiveUserId(session.userId)
-  migrateLegacyStorageForUser(session.userId, session.email)
 
   const current = loadSettings()
   const remote = await fetchRemoteProfile(session.userId)
@@ -86,6 +83,7 @@ function shouldSyncProfileFromAuthEvent(event: string) {
 
 function clearAuthenticatedStorageScope() {
   setActiveUserId(null)
+  clearCloudSnapshot()
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

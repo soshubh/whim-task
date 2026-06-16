@@ -1,7 +1,4 @@
-import {
-  readScopedJson,
-  writeScopedJson,
-} from "@/lib/user-storage"
+import { getCloudSnapshot, patchCloudSnapshot } from "@/lib/cloud-store"
 import { schedulePushAppData } from "@/lib/app-data-sync"
 
 export type PomodoroTimerMode = "focus" | "short-break" | "long-break"
@@ -20,36 +17,27 @@ export const DEFAULT_POMODORO_TIMER_VALUES: PomodoroTimerDefaults = {
   "long-break": 15 * 60,
 }
 
-const STORAGE_KEY = "whim-task-pomodoro-timer-defaults"
-
 function isTimerMode(value: string): value is PomodoroTimerMode {
   return value === "focus" || value === "short-break" || value === "long-break"
 }
 
 export function loadPomodoroTimerDefaults(): PomodoroTimerDefaults {
-  if (typeof window === "undefined") {
-    return DEFAULT_POMODORO_TIMER_VALUES
+  const stored = getCloudSnapshot()?.pomodoro_timer_defaults
+  const nextDefaults = { ...DEFAULT_POMODORO_TIMER_VALUES }
+
+  if (!stored) {
+    return nextDefaults
   }
 
-  try {
-    const parsed = readScopedJson<Partial<Record<string, number>>>(
-      STORAGE_KEY,
-      {},
-    )
-    const nextDefaults = { ...DEFAULT_POMODORO_TIMER_VALUES }
-
-    for (const [key, value] of Object.entries(parsed)) {
-      if (!isTimerMode(key) || typeof value !== "number" || value <= 0) {
-        continue
-      }
-
-      nextDefaults[key] = Math.round(value)
+  for (const [key, value] of Object.entries(stored)) {
+    if (!isTimerMode(key) || typeof value !== "number" || value <= 0) {
+      continue
     }
 
-    return nextDefaults
-  } catch {
-    return DEFAULT_POMODORO_TIMER_VALUES
+    nextDefaults[key] = Math.round(value)
   }
+
+  return nextDefaults
 }
 
 export function savePomodoroTimerDefaults(defaults: PomodoroTimerDefaults) {
@@ -57,7 +45,7 @@ export function savePomodoroTimerDefaults(defaults: PomodoroTimerDefaults) {
     return
   }
 
-  writeScopedJson(STORAGE_KEY, defaults)
+  patchCloudSnapshot({ pomodoro_timer_defaults: defaults })
   schedulePushAppData()
 }
 

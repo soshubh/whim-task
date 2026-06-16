@@ -1,3 +1,4 @@
+import { patchCloudSnapshot, getCloudSnapshot } from "@/lib/cloud-store"
 import {
   fromDateKey,
   matchesRoutineDate,
@@ -5,10 +6,6 @@ import {
   toDateKey,
   type RoutineRule,
 } from "@/lib/planner"
-import {
-  readScopedJson,
-  writeScopedJson,
-} from "@/lib/user-storage"
 
 export type ReminderStatus = "scheduled" | "triggered" | "dismissed"
 
@@ -99,16 +96,7 @@ export function formatReminderDateTimeLabel(dateKey: string, time: string) {
 }
 
 export function loadReminders(): Reminder[] {
-  if (typeof window === "undefined") {
-    return []
-  }
-
-  try {
-    const parsed = readScopedJson<Reminder[]>(REMINDERS_STORAGE_KEY, [])
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : []
-  } catch {
-    return []
-  }
+  return getCloudSnapshot()?.reminders ?? []
 }
 
 export function saveReminders(reminders: Reminder[]) {
@@ -116,7 +104,7 @@ export function saveReminders(reminders: Reminder[]) {
     return
   }
 
-  writeScopedJson(REMINDERS_STORAGE_KEY, reminders)
+  patchCloudSnapshot({ reminders })
   window.dispatchEvent(
     new CustomEvent(REMINDERS_UPDATED_EVENT, {
       detail: { count: reminders.length },

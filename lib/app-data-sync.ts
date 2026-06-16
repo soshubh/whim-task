@@ -1,57 +1,35 @@
+import {
+  clearLegacyAppLocalStorage,
+  createEmptyCloudSnapshot,
+  getCloudSnapshot,
+  importLegacyLocalStorage,
+  setCloudSnapshot,
+  type CloudSnapshot,
+} from "@/lib/cloud-store"
 import type { PlannerDayState, RoutineRule } from "@/lib/planner"
-import {
-  DEFAULT_POMODORO_TIMER_VALUES,
-  loadPomodoroTimerDefaults,
-  type PomodoroTimerDefaults,
-} from "@/lib/pomodoro-timer"
-import {
-  getFocusSessionsStorageKey,
-  getPomodoroSessionLogKey,
-  loadPomodoroSessionLogs,
-  type PomodoroSessionLog,
-} from "@/lib/pomodoro-sessions"
+import { DEFAULT_POMODORO_TIMER_VALUES } from "@/lib/pomodoro-timer"
+import type { PomodoroSessionLog } from "@/lib/pomodoro-sessions"
 import {
   fetchRemoteNotificationSettings,
   notificationSettingsDifferFromDefault,
   saveRemoteNotificationSettings,
 } from "@/lib/notification-settings-sync"
-import { loadReminders, REMINDERS_STORAGE_KEY, type Reminder } from "@/lib/reminders"
+import type { Reminder } from "@/lib/reminders"
 import {
+  DEFAULT_SETTINGS,
   loadSettings,
-  saveSettings,
+  SETTINGS_UPDATED_EVENT,
   type AppSettings,
   type NotificationSettings,
 } from "@/lib/settings"
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import {
-  getActiveUserId,
-  getScopedStorageKey,
-  readScopedItem,
-  readScopedJson,
-  writeScopedItem,
-  writeScopedJson,
-} from "@/lib/user-storage"
+import { getActiveUserId } from "@/lib/user-storage"
 
 export const APP_DATA_SYNCED_EVENT = "whim-app-data-synced"
 
-const PLANNER_STORAGE_KEY = "whim-task-planner-state"
-const ROUTINES_STORAGE_KEY = "whim-task-routines"
-const LOCAL_UPDATED_AT_KEY = "whim-task-local-updated-at"
-const DAILY_UPDATE_MARKER_KEY = "whim-task-last-daily-update"
-const POMODORO_TIMER_STORAGE_KEY = "whim-task-pomodoro-timer-defaults"
 const PUSH_DEBOUNCE_MS = 400
 
-export type UserSyncSnapshot = {
-  app_settings: AppSettings
-  daily_update_marker: string | null
-  notification_settings: NotificationSettings
-  planner_state: Record<string, PlannerDayState>
-  pomodoro_sessions_by_date: Record<string, PomodoroSessionLog[]>
-  pomodoro_timer_defaults: PomodoroTimerDefaults
-  reminders: Reminder[]
-  routines: RoutineRule[]
-  updated_at: string
-}
+export type UserSyncSnapshot = CloudSnapshot
 
 export type UserSyncSnapshotRow = {
   app_settings: AppSettings | null
@@ -59,7 +37,7 @@ export type UserSyncSnapshotRow = {
   notification_settings: NotificationSettings | null
   planner_state: Record<string, PlannerDayState> | null
   pomodoro_sessions_by_date: Record<string, PomodoroSessionLog[]> | null
-  pomodoro_timer_defaults: PomodoroTimerDefaults | null
+  pomodoro_timer_defaults: CloudSnapshot["pomodoro_timer_defaults"] | null
   reminders: Reminder[] | null
   routines: RoutineRule[] | null
   updated_at: string
@@ -71,14 +49,6 @@ let pushDebounceId: number | null = null
 let pushInFlight: Promise<void> | null = null
 let lastAppliedRemoteUpdatedAt: string | null = null
 let lastPushedUpdatedAt: string | null = null
-
-function touchLocalUpdatedAt(iso = new Date().toISOString()) {
-  writeScopedItem(LOCAL_UPDATED_AT_KEY, iso)
-}
-
-function readLocalUpdatedAt() {
-  return readScopedItem(LOCAL_UPDATED_AT_KEY)
-}
 
 function mergeAppSettings(
   current: AppSettings,
@@ -105,64 +75,6 @@ function mergeAppSettings(
       },
     },
   }
-}
-
-function listScopedStorageKeys(userId: string, baseKeyPrefix: string) {
-  const prefix = getScopedStorageKey(baseKeyPrefix, userId)
-  const keys: string[] = []
-
-  if (typeof window === "undefined") {
-    return keys
-  }
-
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index)
-
-    if (key?.startsWith(prefix)) {
-      keys.push(key)
-    }
-  }
-
-  return keys
-}
-
-function clearPomodoroSessionsForUser(userId: string) {
-  if (typeof window === "undefined") {
-    return
-  }
-
-  for (const baseKey of [
-    "whim-task-pomodoro-session-log-",
-    "whim-task-pomodoro-sessions-",
-  ]) {
-    for (const key of listScopedStorageKeys(userId, baseKey)) {
-      window.localStorage.removeItem(key)
-    }
-  }
-}
-
-function collectPomodoroSessionsByDate(userId: string) {
-  const logPrefix = getScopedStorageKey(
-    "whim-task-pomodoro-session-log-",
-    userId,
-  )
-  const sessions: Record<string, PomodoroSessionLog[]> = {}
-
-  if (typeof window === "undefined") {
-    return sessions
-  }
-
-  for (const key of listScopedStorageKeys(userId, "whim-task-pomodoro-session-log-")) {
-    const dateKey = key.slice(logPrefix.length)
-
-    if (!dateKey) {
-      continue
-    }
-
-    sessions[dateKey] = loadPomodoroSessionLogs(dateKey)
-  }
-
-  return sessions
 }
 
 function hasPlannerContent(state: Record<string, PlannerDayState>) {
@@ -203,66 +115,25 @@ export function snapshotHasData(snapshot: Pick<
   )
 }
 
-export function collectLocalSnapshot(userId: string): UserSyncSnapshot {
-  const appSettings = loadSettings()
-
-  return {
-    app_settings: appSettings,
-    planner_state: readScopedJson<Record<string, PlannerDayState>>(
-      PLANNER_STORAGE_KEY,
-      {},
-    ),
-    routines: readScopedJson<RoutineRule[]>(ROUTINES_STORAGE_KEY, []),
-    reminders: loadReminders(),
-    notification_settings: appSettings.notifications,
-    pomodoro_timer_defaults: loadPomodoroTimerDefaults(),
-    pomodoro_sessions_by_date: collectPomodoroSessionsByDate(userId),
-    daily_update_marker: readScopedItem(DAILY_UPDATE_MARKER_KEY),
-    updated_at: readLocalUpdatedAt() ?? new Date().toISOString(),
-  }
+export function collectCloudSnapshot(): UserSyncSnapshot {
+  return getCloudSnapshot() ?? createEmptyCloudSnapshot()
 }
 
-function writePomodoroSessionsByDate(
-  userId: string,
-  sessionsByDate: Record<string, PomodoroSessionLog[]>,
-) {
-  clearPomodoroSessionsForUser(userId)
-
-  for (const [dateKey, logs] of Object.entries(sessionsByDate)) {
-    writeScopedItem(getPomodoroSessionLogKey(dateKey), JSON.stringify(logs))
-    writeScopedItem(getFocusSessionsStorageKey(dateKey), `${logs.length}`)
-  }
-}
-
-export function applySnapshotToLocal(snapshot: UserSyncSnapshot) {
+export function applyCloudSnapshot(snapshot: UserSyncSnapshot) {
   if (typeof window === "undefined") {
     return
   }
 
-  const userId = getActiveUserId()
-
-  if (!userId) {
+  if (!getActiveUserId()) {
     return
   }
 
   isApplyingRemote = true
 
   try {
-    writeScopedJson(PLANNER_STORAGE_KEY, snapshot.planner_state)
-    writeScopedJson(ROUTINES_STORAGE_KEY, snapshot.routines)
-    writeScopedJson(REMINDERS_STORAGE_KEY, snapshot.reminders)
-    writeScopedJson(POMODORO_TIMER_STORAGE_KEY, snapshot.pomodoro_timer_defaults)
-    writePomodoroSessionsByDate(userId, snapshot.pomodoro_sessions_by_date)
-
-    if (snapshot.daily_update_marker) {
-      writeScopedItem(DAILY_UPDATE_MARKER_KEY, snapshot.daily_update_marker)
-    } else {
-      writeScopedItem(DAILY_UPDATE_MARKER_KEY, "")
-    }
-
-    saveSettings(snapshot.app_settings, { skipCloudSync: true })
-    writeScopedItem(LOCAL_UPDATED_AT_KEY, snapshot.updated_at)
+    setCloudSnapshot(snapshot)
     lastAppliedRemoteUpdatedAt = snapshot.updated_at
+    window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT))
   } finally {
     isApplyingRemote = false
   }
@@ -319,10 +190,10 @@ function shouldApplyRemoteRow(row: UserSyncSnapshotRow) {
     return false
   }
 
-  const localTime = Date.parse(readLocalUpdatedAt() || "0")
+  const memoryTime = Date.parse(getCloudSnapshot()?.updated_at || "0")
   const remoteTime = Date.parse(row.updated_at || "0")
 
-  return remoteTime > localTime
+  return remoteTime > memoryTime
 }
 
 export function applyRemoteSnapshotRow(row: UserSyncSnapshotRow) {
@@ -330,7 +201,7 @@ export function applyRemoteSnapshotRow(row: UserSyncSnapshotRow) {
     return
   }
 
-  applySnapshotToLocal(rowToSnapshot(row, null))
+  applyCloudSnapshot(rowToSnapshot(row, null))
 }
 
 export async function fetchRemoteSnapshot(
@@ -406,7 +277,7 @@ export async function pushRemoteSnapshot(
 
   await saveRemoteNotificationSettings(userId, snapshot.app_settings.notifications)
 
-  touchLocalUpdatedAt(updatedAt)
+  setCloudSnapshot({ ...snapshot, updated_at: updatedAt })
   lastPushedUpdatedAt = updatedAt
   lastAppliedRemoteUpdatedAt = updatedAt
 }
@@ -415,6 +286,10 @@ export async function flushPushAppData() {
   const userId = getActiveUserId()
 
   if (!userId || !isSupabaseConfigured() || isApplyingRemote) {
+    return
+  }
+
+  if (pushDebounceId === null && !pushInFlight) {
     return
   }
 
@@ -428,7 +303,7 @@ export async function flushPushAppData() {
     return
   }
 
-  pushInFlight = pushRemoteSnapshot(userId, collectLocalSnapshot(userId))
+  pushInFlight = pushRemoteSnapshot(userId, collectCloudSnapshot())
     .catch((error) => {
       console.error("Failed to flush app data sync to Supabase", error)
     })
@@ -444,33 +319,49 @@ export async function syncAppDataFromRemote(userId: string) {
     return
   }
 
-  await flushPushAppData()
+  if (pushDebounceId !== null || pushInFlight) {
+    await flushPushAppData()
+  }
 
-  const localSnapshot = collectLocalSnapshot(userId)
   const remoteSnapshot = await fetchRemoteSnapshot(userId)
-  const localTime = Date.parse(readLocalUpdatedAt() || "0")
-  const remoteTime = remoteSnapshot ? Date.parse(remoteSnapshot.updated_at) : 0
+  const memorySnapshot = getCloudSnapshot()
 
   if (!remoteSnapshot) {
-    if (snapshotHasData(localSnapshot)) {
-      await pushRemoteSnapshot(userId, {
-        ...localSnapshot,
-        updated_at: new Date().toISOString(),
-      })
+    const legacySnapshot = importLegacyLocalStorage(userId)
+    const snapshot =
+      legacySnapshot ??
+      memorySnapshot ??
+      createEmptyCloudSnapshot(loadSettings() ?? DEFAULT_SETTINGS)
+
+    applyCloudSnapshot(snapshot)
+
+    if (snapshotHasData(snapshot)) {
+      await pushRemoteSnapshot(userId, collectCloudSnapshot())
+    }
+
+    if (legacySnapshot) {
+      clearLegacyAppLocalStorage(userId)
     }
 
     return
   }
 
-  if (localTime >= remoteTime) {
-    await pushRemoteSnapshot(userId, {
-      ...localSnapshot,
-      updated_at: new Date().toISOString(),
-    })
-    return
+  const memoryTime = Date.parse(memorySnapshot?.updated_at || "0")
+  const remoteTime = Date.parse(remoteSnapshot.updated_at || "0")
+  const remoteHasData = snapshotHasData(remoteSnapshot)
+  const memoryHasData = memorySnapshot ? snapshotHasData(memorySnapshot) : false
+
+  if (!memorySnapshot || (remoteHasData && remoteTime >= memoryTime)) {
+    applyCloudSnapshot(remoteSnapshot)
+  } else if (memoryHasData && memoryTime > remoteTime) {
+    await pushRemoteSnapshot(userId, memorySnapshot)
+  } else if (memoryHasData) {
+    await pushRemoteSnapshot(userId, memorySnapshot)
+  } else {
+    applyCloudSnapshot(remoteSnapshot)
   }
 
-  applySnapshotToLocal(remoteSnapshot)
+  clearLegacyAppLocalStorage(userId)
 }
 
 export function schedulePushAppData() {
@@ -484,8 +375,6 @@ export function schedulePushAppData() {
     return
   }
 
-  touchLocalUpdatedAt()
-
   if (pushDebounceId !== null) {
     window.clearTimeout(pushDebounceId)
   }
@@ -493,7 +382,7 @@ export function schedulePushAppData() {
   pushDebounceId = window.setTimeout(() => {
     pushDebounceId = null
 
-    pushInFlight = pushRemoteSnapshot(userId, collectLocalSnapshot(userId))
+    pushInFlight = pushRemoteSnapshot(userId, collectCloudSnapshot())
       .catch((error) => {
         console.error("Failed to sync app data to Supabase", error)
       })

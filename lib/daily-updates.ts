@@ -1,3 +1,5 @@
+import { getCloudSnapshot, patchCloudSnapshot } from "@/lib/cloud-store"
+import { schedulePushAppData } from "@/lib/app-data-sync"
 import { parseTimeValue } from "@/lib/reminders"
 import type { DailyUpdateSettings } from "@/lib/settings"
 import {
@@ -9,12 +11,6 @@ import {
   type RoutineRule,
 } from "@/lib/planner"
 
-import {
-  readScopedItem,
-  writeScopedItem,
-} from "@/lib/user-storage"
-import { schedulePushAppData } from "@/lib/app-data-sync"
-
 export type DailyTaskSummary = {
   added: number
   completed: number
@@ -22,8 +18,6 @@ export type DailyTaskSummary = {
 }
 
 export type DailyUpdateSlot = "morning" | "evening"
-
-const LAST_DAILY_UPDATE_KEY = "whim-task-last-daily-update"
 
 export function getTodayTaskSummary(
   plannerState: Record<string, PlannerDayState>,
@@ -84,13 +78,9 @@ export function hasDailyUpdateFired(
   slot: DailyUpdateSlot,
   referenceDate = new Date(),
 ) {
-  if (typeof window === "undefined") {
-    return false
-  }
-
   const dateKey = toDateKey(stripTime(referenceDate))
   const marker = `${dateKey}:${slot}`
-  return readScopedItem(LAST_DAILY_UPDATE_KEY) === marker
+  return getCloudSnapshot()?.daily_update_marker === marker
 }
 
 export function markDailyUpdateFired(
@@ -102,7 +92,7 @@ export function markDailyUpdateFired(
   }
 
   const dateKey = toDateKey(stripTime(referenceDate))
-  writeScopedItem(LAST_DAILY_UPDATE_KEY, `${dateKey}:${slot}`)
+  patchCloudSnapshot({ daily_update_marker: `${dateKey}:${slot}` })
   schedulePushAppData()
 }
 
