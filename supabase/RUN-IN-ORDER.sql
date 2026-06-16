@@ -1,0 +1,15 @@
+-- =============================================================================
+-- Whim Task — Full database setup
+-- =============================================================================
+--
+-- OPTION A (recommended) — one paste, one run:
+--   supabase/setup-normalized-sync-all-in-one.sql
+--
+-- OPTION B — step by step:
+--   1. supabase/migrations/20250615000000_initial_schema.sql  (first time only)
+--   2. supabase/01-schema-fixes-for-client-ids.sql
+--   3. supabase/02-migrate-snapshot-to-tables.sql
+--   4. supabase/03-drop-legacy-sync.sql
+--   5. supabase/04-normalized-realtime-setup.sql
+--
+-- =============================================================================

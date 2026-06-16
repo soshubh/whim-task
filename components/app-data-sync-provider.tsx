@@ -4,9 +4,8 @@ import * as React from "react"
 
 import { useAuth } from "@/components/auth-provider"
 import {
-  applyRemoteSnapshotRow,
   flushPushAppData,
-  subscribeToRemoteSnapshot,
+  subscribeToRemoteAppState,
   syncAppDataFromRemote,
 } from "@/lib/app-data-sync"
 
@@ -22,8 +21,8 @@ export function AppDataSyncProvider({
       return
     }
 
-    const unsubscribe = subscribeToRemoteSnapshot(session.userId, (row) => {
-      applyRemoteSnapshotRow(row)
+    const unsubscribe = subscribeToRemoteAppState(session.userId, () => {
+      // Realtime handler schedules a debounced DB refresh in app-data-sync.
     })
 
     return unsubscribe
