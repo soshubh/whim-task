@@ -110,6 +110,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   )
   const [routines, setRoutines] = React.useState<RoutineRule[]>([])
   const [reminders, setReminders] = React.useState<Reminder[]>([])
+  const [isStorageHydrated, setIsStorageHydrated] = React.useState(false)
 
   React.useEffect(() => {
     if (isLoading) {
@@ -117,6 +118,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!session) {
+      setIsStorageHydrated(false)
       setPlannerState(createInitialPlannerState())
       setRoutines([])
       setReminders([])
@@ -126,6 +128,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     setPlannerState(loadPlannerState())
     setRoutines(loadRoutines())
     setReminders(loadReminders())
+    setIsStorageHydrated(true)
   }, [isLoading, session?.userId])
 
   React.useEffect(() => {
@@ -150,31 +153,31 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
   }, [session?.userId])
 
   React.useEffect(() => {
-    if (!session) {
+    if (!session || !isStorageHydrated) {
       return
     }
 
     writeScopedJson(STORAGE_KEY, plannerState)
     schedulePushAppData()
-  }, [plannerState, session?.userId])
+  }, [plannerState, session?.userId, isStorageHydrated])
 
   React.useEffect(() => {
-    if (!session) {
+    if (!session || !isStorageHydrated) {
       return
     }
 
     writeScopedJson(ROUTINES_KEY, routines)
     schedulePushAppData()
-  }, [routines, session?.userId])
+  }, [routines, session?.userId, isStorageHydrated])
 
   React.useEffect(() => {
-    if (!session) {
+    if (!session || !isStorageHydrated) {
       return
     }
 
     saveReminders(reminders)
     schedulePushAppData()
-  }, [reminders, session?.userId])
+  }, [reminders, session?.userId, isStorageHydrated])
 
   React.useEffect(() => {
     const refreshReminders = () => {

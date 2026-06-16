@@ -5,6 +5,7 @@ import * as React from "react"
 import { useAuth } from "@/components/auth-provider"
 import {
   applyRemoteSnapshotRow,
+  flushPushAppData,
   subscribeToRemoteSnapshot,
   syncAppDataFromRemote,
 } from "@/lib/app-data-sync"
@@ -34,7 +35,7 @@ export function AppDataSyncProvider({
     }
 
     const refreshFromCloud = () => {
-      void syncAppDataFromRemote(session.userId, { preferRemote: true })
+      void syncAppDataFromRemote(session.userId)
     }
 
     const handleVisibilityChange = () => {
@@ -54,11 +55,7 @@ export function AppDataSyncProvider({
 
   React.useEffect(() => {
     const flushOnExit = () => {
-      import("@/lib/app-data-sync")
-        .then(({ flushPushAppData }) => {
-          flushPushAppData()
-        })
-        .catch(() => undefined)
+      void flushPushAppData()
     }
 
     window.addEventListener("pagehide", flushOnExit)

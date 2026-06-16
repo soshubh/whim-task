@@ -90,13 +90,20 @@ export function loadSettings(): AppSettings {
   }
 }
 
-export function saveSettings(settings: AppSettings) {
+export function saveSettings(
+  settings: AppSettings,
+  options?: { skipCloudSync?: boolean },
+) {
   if (typeof window === "undefined") {
     return
   }
 
   writeScopedJson(SETTINGS_STORAGE_KEY, settings)
   window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT))
+
+  if (options?.skipCloudSync) {
+    return
+  }
 
   import("@/lib/app-data-sync")
     .then(({ schedulePushAppData }) => {
