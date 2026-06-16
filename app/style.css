@@ -587,7 +587,6 @@
 .home-dashboard__ring-svg .home-dashboard__ring-progress {
   stroke: url(#home-dashboard-ring-progress-gradient);
   filter: blur(calc(8px * var(--ui-scale)));
-  -webkit-filter: blur(calc(6px * var(--ui-scale)));
 }
 
 .home-dashboard__ring-center {
