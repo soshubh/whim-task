@@ -1215,13 +1215,40 @@ export function DailyPlannerView() {
     )
   }
 
+  const handleGoToToday = () => {
+    const nextDate = stripTime(new Date())
+
+    setCenterDate(nextDate)
+    setCalendarMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1))
+    setIsCalendarOpen(false)
+  }
+
+  const handleShiftCenterDate = (days: number) => {
+    setCenterDate((current) => {
+      const nextDate = addDays(current, days)
+
+      setCalendarMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1))
+      return nextDate
+    })
+    setIsCalendarOpen(false)
+  }
+
   const renderDailyDateNav = () => (
     <div className="daily-planner__date-nav" ref={datePickerRef}>
       <button
+        aria-label="Show today"
+        className="daily-planner__toolbar-button daily-planner__today-button"
+        onClick={handleGoToToday}
+        type="button"
+      >
+        Today
+      </button>
+
+      <button
         aria-expanded={isCalendarOpen}
         aria-label={`${formatPlannerCardDate(centerDate)}. Open calendar`}
-        className={`daily-planner__view-chip daily-planner__calendar-chip ${
-          isCalendarOpen ? "daily-planner__view-chip--active" : ""
+        className={`daily-planner__icon-button daily-planner__calendar-chip ${
+          isCalendarOpen ? "daily-planner__toolbar-button--active" : ""
         }`}
         onClick={() => {
           setCalendarMonth(new Date(centerDate.getFullYear(), centerDate.getMonth(), 1))
@@ -1230,6 +1257,24 @@ export function DailyPlannerView() {
         type="button"
       >
         <CalendarDays className="size-4" />
+      </button>
+
+      <button
+        aria-label="Show previous day"
+        className="daily-planner__icon-button"
+        onClick={() => handleShiftCenterDate(-1)}
+        type="button"
+      >
+        <ChevronLeft className="size-4" />
+      </button>
+
+      <button
+        aria-label="Show next day"
+        className="daily-planner__icon-button"
+        onClick={() => handleShiftCenterDate(1)}
+        type="button"
+      >
+        <ChevronRight className="size-4" />
       </button>
 
       {isCalendarOpen ? (

@@ -1108,11 +1108,28 @@
   flex: none;
 }
 
+.home-dashboard__calendar-day--completed .home-dashboard__calendar-day-number {
+  position: relative;
+}
+
+.home-dashboard__calendar-day--completed
+  .home-dashboard__calendar-day-number::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(-8px * var(--ui-scale));
+  width: calc(5px * var(--ui-scale));
+  height: calc(5px * var(--ui-scale));
+  border-radius: 999px;
+  background: var(--primary);
+  transform: translateX(-50%);
+}
+
 .home-dashboard__calendar-day.daily-planner__calendar-day--today,
 .home-dashboard__calendar-day.daily-planner__calendar-day--today.daily-planner__calendar-day--selected {
   border-color: transparent;
-  background: color-mix(in srgb, var(--primary) 7%, white);
-  color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -1122,25 +1139,9 @@
   background: color-mix(in srgb, var(--primary) 5%, white);
 }
 
-.home-dashboard__calendar-day--completed:not(
-  .daily-planner__calendar-day--selected
-) {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.home-dashboard__calendar-day--completed:not(
-    .daily-planner__calendar-day--selected
-  )
-  .home-dashboard__calendar-routine-dot {
+.home-dashboard__calendar-day.daily-planner__calendar-day--today
+  .home-dashboard__calendar-day-number::after {
   background: var(--primary-foreground);
-}
-
-.home-dashboard__calendar-day--completed.daily-planner__calendar-day--today {
-  background: var(--primary);
-  border-color: transparent;
-  color: var(--primary-foreground);
 }
 
 .home-dashboard__progress-value {
@@ -1365,12 +1366,13 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: var(--space-2);
   flex-shrink: 0;
   width: auto;
 }
 
 .daily-planner__calendar-chip {
-  padding: var(--space-3);
+  padding: 0;
 }
 
 .daily-planner__date-nav .daily-planner__calendar {
@@ -1383,6 +1385,10 @@
 .daily-planner__date-button {
   min-width: 0;
   width: fit-content;
+}
+
+.daily-planner__today-button {
+  min-width: calc(72px * var(--ui-scale));
 }
 
 .daily-planner__calendar {
