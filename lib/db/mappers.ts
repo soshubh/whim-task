@@ -55,6 +55,7 @@ export type ReminderRow = {
 }
 
 export type PomodoroSessionRow = {
+  created_at?: string
   date_key: string
   duration_seconds: number
   id: string
@@ -71,6 +72,7 @@ export type PomodoroTimerRow = {
 
 export type DailyUpdateLogRow = {
   date_key: string
+  fired_at?: string
   slot: "morning" | "evening"
 }
 
@@ -203,8 +205,8 @@ export function buildPlannerStateFromRows(
   for (const day of days) {
     plannerState[day.date_key] = {
       ...createEmptyDayState(),
-      draft: "",
-      isAdding: false,
+      draft: day.draft,
+      isAdding: day.is_adding,
       showCompleted: day.show_completed,
     }
   }

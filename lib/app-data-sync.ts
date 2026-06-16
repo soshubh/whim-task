@@ -12,7 +12,6 @@ import { appStateHasRows, loadAppStateFromDb } from "@/lib/db/load-app-state"
 import { subscribeToAppTables } from "@/lib/db/realtime"
 import { syncAppStateToDb } from "@/lib/db/sync-app-state"
 import type { PlannerDayState, RoutineRule } from "@/lib/planner"
-import { countPlannerTasks, mergePlannerState } from "@/lib/planner"
 import type { PomodoroSessionLog } from "@/lib/pomodoro-sessions"
 import { notificationSettingsDifferFromDefault } from "@/lib/notification-settings-sync"
 import type { Reminder } from "@/lib/reminders"
@@ -117,30 +116,10 @@ export function applyCloudSnapshot(snapshot: UserSyncSnapshot) {
     return
   }
 
-  const currentSnapshot = getCloudSnapshot()
-  const mergedSnapshot: UserSyncSnapshot = currentSnapshot
-    ? {
-        ...snapshot,
-        planner_state: mergePlannerState(
-          currentSnapshot.planner_state,
-          snapshot.planner_state,
-        ),
-        routines:
-          snapshot.routines.length >= currentSnapshot.routines.length
-            ? snapshot.routines
-            : currentSnapshot.routines,
-        reminders:
-          snapshot.reminders.length >= currentSnapshot.reminders.length
-            ? snapshot.reminders
-            : currentSnapshot.reminders,
-        updated_at: snapshot.updated_at,
-      }
-    : snapshot
-
   isApplyingRemote = true
 
   try {
-    setCloudSnapshot(mergedSnapshot, { fromRemote: true })
+    setCloudSnapshot(snapshot, { fromRemote: true })
     window.dispatchEvent(new CustomEvent(SETTINGS_UPDATED_EVENT))
   } finally {
     isApplyingRemote = false
@@ -203,22 +182,7 @@ export async function refreshAppStateFromDb(userId: string) {
     return
   }
 
-  const memorySnapshot = getCloudSnapshot()
-  const memoryTime = Date.parse(memorySnapshot?.updated_at || "0")
-  const remoteTime = Date.parse(remoteSnapshot.updated_at || "0")
-
-  if (!memorySnapshot) {
-    applyCloudSnapshot(remoteSnapshot)
-    return
-  }
-
-  if (
-    remoteTime >= memoryTime ||
-    countPlannerTasks(remoteSnapshot.planner_state) >=
-      countPlannerTasks(memorySnapshot.planner_state)
-  ) {
-    applyCloudSnapshot(remoteSnapshot)
-  }
+  applyCloudSnapshot(remoteSnapshot)
 }
 
 function scheduleRemoteRefresh(userId: string) {
@@ -289,17 +253,9 @@ export async function syncAppDataFromRemote(
       return
     }
 
-    const memoryTime = Date.parse(memorySnapshot?.updated_at || "0")
-    const remoteTime = Date.parse(remoteSnapshot.updated_at || "0")
-    const memoryHasData = memorySnapshot ? snapshotHasData(memorySnapshot) : false
-
-    if (!memorySnapshot || remoteTime >= memoryTime) {
+    if (!memorySnapshot || !hasPendingLocalChanges()) {
       applyCloudSnapshot(remoteSnapshot)
-    } else if (
-      memoryHasData &&
-      countPlannerTasks(memorySnapshot.planner_state) >=
-        countPlannerTasks(remoteSnapshot.planner_state)
-    ) {
+    } else if (snapshotHasData(memorySnapshot)) {
       await pushCloudSnapshotToDb(userId, memorySnapshot)
     } else {
       applyCloudSnapshot(remoteSnapshot)
@@ -364,7 +320,7 @@ export type UserSyncSnapshotRow = {
   user_id: string
 }
 
-export function applyRemoteSnapshotRow(_row: UserSyncSnapshotRow) {
+export function applyRemoteSnapshotRow() {
   const userId = getActiveUserId()
 
   if (!userId) {

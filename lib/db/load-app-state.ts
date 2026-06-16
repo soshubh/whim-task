@@ -86,12 +86,12 @@ export async function loadAppStateFromDb(
       .maybeSingle(),
     supabase
       .from("pomodoro_sessions")
-      .select("id, date_key, task_id, task_title, duration_seconds")
+      .select("id, date_key, task_id, task_title, duration_seconds, created_at")
       .eq("user_id", userId)
       .order("date_key", { ascending: false }),
     supabase
       .from("daily_update_logs")
-      .select("date_key, slot")
+      .select("date_key, slot, fired_at")
       .eq("user_id", userId)
       .order("date_key", { ascending: true }),
   ])
@@ -158,6 +158,12 @@ export async function loadAppStateFromDb(
     ...tasks.map((row) => row.updated_at),
     ...((remindersResult.data ?? []) as ReminderRow[]).map((row) => row.updated_at),
     pomodoroTimerResult.data?.updated_at,
+    ...((pomodoroSessionsResult.data ?? []) as PomodoroSessionRow[]).map(
+      (row) => row.created_at,
+    ),
+    ...((dailyLogsResult.data ?? []) as DailyUpdateLogRow[]).map(
+      (row) => row.fired_at,
+    ),
   ])
 
   return assembleSnapshot({
