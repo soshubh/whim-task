@@ -2266,7 +2266,7 @@
 .content-drawer__backdrop {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 7;
   border: 0;
   background: rgb(255 255 255 / 0.72);
   backdrop-filter: blur(calc(6px * var(--ui-scale)));
@@ -2288,7 +2288,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: 5;
+  z-index: 8;
   display: flex;
   width: min(100%, calc(360px * var(--ui-scale)));
   flex-direction: column;
@@ -2585,6 +2585,36 @@
   line-height: var(--line-height-snug);
 }
 
+.content-drawer__settings-item--permission {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.content-drawer__permission-button {
+  width: 100%;
+  border: 0;
+  border-radius: calc(999px * var(--ui-scale));
+  background: var(--primary);
+  color: var(--primary-foreground);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+  padding: calc(12px * var(--ui-scale)) calc(16px * var(--ui-scale));
+  text-align: center;
+  touch-action: manipulation;
+}
+
+.content-drawer__permission-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.content-drawer__permission-button:hover {
+  opacity: 0.92;
+}
+
 .content-drawer__settings-sound-select {
   display: inline-flex;
   min-width: 0;
@@ -2866,6 +2896,10 @@
 .content-drawer__version {
   color: var(--muted-foreground);
   font-size: var(--font-size-sm);
+}
+
+.content-drawer__section--mobile-only {
+  display: none;
 }
 
 .content-drawer__logout-link {
@@ -4347,16 +4381,24 @@
     padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
   }
 
+  .content-drawer__section--mobile-only {
+    display: block;
+  }
+
   .content-drawer__logout-link {
     display: inline-flex;
     align-items: center;
-    border: 0;
-    background: transparent;
+    justify-content: center;
+    width: 100%;
+    min-height: calc(48px * var(--ui-scale));
+    border: 1px solid color-mix(in srgb, #e11d48 20%, var(--border));
+    border-radius: calc(16px * var(--ui-scale));
+    background: color-mix(in srgb, #e11d48 7%, white);
     color: #e11d48;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
     line-height: var(--line-height-snug);
-    padding: var(--space-2) 0;
+    padding: var(--space-3) var(--space-4);
   }
 
   .content-drawer__logout-link:active {

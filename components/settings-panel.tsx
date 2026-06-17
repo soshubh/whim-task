@@ -5,7 +5,11 @@ import { Camera, Check, Volume2 } from "lucide-react"
 
 import { ContentDrawer } from "@/components/content-drawer"
 import { useSettings } from "@/components/settings-provider"
-import { playNotificationSound } from "@/lib/browser-notifications"
+import {
+  getBrowserNotificationPermission,
+  playNotificationSound,
+  promptBrowserNotificationPermission,
+} from "@/lib/browser-notifications"
 import { APP_NAME, APP_VERSION } from "@/lib/app-meta"
 import {
   areSettingsEqual,
@@ -35,7 +39,7 @@ export function SettingsPanel({ onClose, onLogout, open }: SettingsPanelProps) {
   const {
     browserPermission,
     commitSettings,
-    requestBrowserPermission,
+    refreshBrowserPermission,
     settings,
   } = useSettings()
 
@@ -45,11 +49,17 @@ export function SettingsPanel({ onClose, onLogout, open }: SettingsPanelProps) {
   const [isSaving, setIsSaving] = React.useState(false)
   const [saveError, setSaveError] = React.useState<string | null>(null)
 
+  const [notificationHint, setNotificationHint] = React.useState<string | null>(
+    null,
+  )
+  const [isCheckingPermission, setIsCheckingPermission] = React.useState(false)
+
   React.useEffect(() => {
     if (open) {
       setDraft(settings)
       pendingAvatarFileRef.current = null
       setSaveError(null)
+      setNotificationHint(null)
     }
   }, [open, settings])
 
@@ -101,6 +111,88 @@ export function SettingsPanel({ onClose, onLogout, open }: SettingsPanelProps) {
     }))
   }
 
+  const disableDailyUpdateNotifications = () => {
+    updateDraftDailyUpdate({ enabled: false })
+    updateDraftNotifications({ browserNotificationsEnabled: false })
+  }
+
+  const readBrowserPermission = React.useCallback(() => {
+    refreshBrowserPermission()
+    return getBrowserNotificationPermission()
+  }, [refreshBrowserPermission])
+
+  const syncBrowserNotificationsEnabled = (
+    permission: ReturnType<typeof getBrowserNotificationPermission>,
+  ) => {
+    updateDraftNotifications({
+      browserNotificationsEnabled: permission === "granted",
+    })
+  }
+
+  const handleDailyUpdateToggle = (checked: boolean) => {
+    setNotificationHint(null)
+
+    if (!checked) {
+      disableDailyUpdateNotifications()
+      return
+    }
+
+    updateDraftDailyUpdate({ enabled: true })
+
+    const permission = readBrowserPermission()
+    syncBrowserNotificationsEnabled(permission)
+
+    if (permission === "unsupported") {
+      setNotificationHint(
+        "Daily updates are on in the app. This browser does not support push notifications.",
+      )
+    }
+  }
+
+  const handleAllowBrowserNotifications = async () => {
+    setIsCheckingPermission(true)
+    setNotificationHint(null)
+
+    try {
+      const permissionBefore = getBrowserNotificationPermission()
+
+      if (permissionBefore === "unsupported") {
+        setNotificationHint("This browser does not support notifications.")
+        return
+      }
+
+      if (permissionBefore === "granted") {
+        updateDraftNotifications({ browserNotificationsEnabled: true })
+        refreshBrowserPermission()
+        return
+      }
+
+      const permission = await promptBrowserNotificationPermission()
+      refreshBrowserPermission()
+
+      if (permission === "granted") {
+        updateDraftNotifications({ browserNotificationsEnabled: true })
+        setNotificationHint(null)
+        return
+      }
+
+      if (permission === "denied" && permissionBefore === "denied") {
+        setNotificationHint(
+          "Notifications are blocked in your browser. Open site settings, allow notifications for this site, then tap Allow notifications again.",
+        )
+        return
+      }
+
+      setNotificationHint(
+        "Notifications were not allowed. Tap Allow notifications to try again.",
+      )
+    } catch {
+      setNotificationHint("Could not enable browser notifications.")
+    } finally {
+      setIsCheckingPermission(false)
+    }
+  }
+
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) {
@@ -125,38 +217,19 @@ export function SettingsPanel({ onClose, onLogout, open }: SettingsPanelProps) {
     reader.readAsDataURL(file)
   }
 
-  const handleAllowBrowserNotifications = async () => {
-    const permission = await requestBrowserPermission()
-
-    if (permission === "granted") {
-      updateDraftNotifications({ browserNotificationsEnabled: true })
-    }
-  }
-
-  const showPermissionSection = browserPermission !== "granted"
-
   const handleSave = async () => {
     setSaveError(null)
     setIsSaving(true)
 
     try {
-      let nextDraft = draft
-
-      if (
-        draft.notifications.browserNotificationsEnabled &&
-        browserPermission !== "granted"
-      ) {
-        const permission = await requestBrowserPermission()
-
-        if (permission !== "granted") {
-          nextDraft = {
-            ...draft,
-            notifications: {
-              ...draft.notifications,
-              browserNotificationsEnabled: false,
-            },
-          }
-        }
+      const permission = readBrowserPermission()
+      const nextDraft: AppSettings = {
+        ...draft,
+        notifications: {
+          ...draft.notifications,
+          browserNotificationsEnabled:
+            draft.notifications.dailyUpdate.enabled && permission === "granted",
+        },
       }
 
       await commitSettings(nextDraft, {
@@ -274,10 +347,29 @@ export function SettingsPanel({ onClose, onLogout, open }: SettingsPanelProps) {
           <SettingsToggleRow
             checked={dailyUpdate.enabled}
             label="Daily update notifications"
-            onCheckedChange={(checked) =>
-              updateDraftDailyUpdate({ enabled: checked })
-            }
+            onCheckedChange={handleDailyUpdateToggle}
           />
+
+          {dailyUpdate.enabled &&
+          browserPermission !== "granted" &&
+          browserPermission !== "unsupported" ? (
+            <SettingsItem className="content-drawer__settings-item--permission">
+              <button
+                className="content-drawer__permission-button"
+                disabled={isCheckingPermission}
+                onClick={() => void handleAllowBrowserNotifications()}
+                type="button"
+              >
+                {isCheckingPermission ? "Allowing..." : "Allow notifications"}
+              </button>
+            </SettingsItem>
+          ) : notificationHint ? (
+            <SettingsItem>
+              <p className="content-drawer__settings-hint" role="alert">
+                {notificationHint}
+              </p>
+            </SettingsItem>
+          ) : null}
 
           {dailyUpdate.enabled ? (
             <>
@@ -362,48 +454,18 @@ export function SettingsPanel({ onClose, onLogout, open }: SettingsPanelProps) {
         </SettingsGroup>
       </section>
 
-      {showPermissionSection ? (
-        <section className="content-drawer__section">
-          <h3 className="content-drawer__section-title">Permission</h3>
-
-          <SettingsGroup>
-            <SettingsItem>
-              <button
-                className="content-drawer__settings-action"
-                onClick={() => void handleAllowBrowserNotifications()}
-                type="button"
-              >
-                Allow browser notifications
-              </button>
-            </SettingsItem>
-
-            {browserPermission === "denied" ? (
-              <SettingsItem>
-                <p className="content-drawer__settings-hint">
-                  Notifications are blocked in your browser. Enable them in site
-                  settings to receive alerts outside the tab.
-                </p>
-              </SettingsItem>
-            ) : null}
-          </SettingsGroup>
-        </section>
-      ) : null}
-
       {onLogout ? (
-        <section className="content-drawer__section content-drawer__section--compact">
-          <SettingsGroup>
-            <SettingsItem>
-              <button
-                className="content-drawer__logout-link"
-                onClick={onLogout}
-                type="button"
-              >
-                Logout
-              </button>
-            </SettingsItem>
-          </SettingsGroup>
+        <section className="content-drawer__section content-drawer__section--mobile-only">
+          <button
+            className="content-drawer__logout-link"
+            onClick={onLogout}
+            type="button"
+          >
+            Logout
+          </button>
         </section>
       ) : null}
+
     </ContentDrawer>
   )
 }

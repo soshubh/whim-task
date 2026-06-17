@@ -68,8 +68,10 @@ function AppShell() {
   const [isSectionReady, setIsSectionReady] = React.useState(false)
   const {
     bellShaking,
+    clearToasts,
     closeNotifications,
     notificationCount,
+    notificationsOpen,
     openNotifications,
   } = useReminderUi()
   const { closeSettings, openSettings, settings } = useSettings()
@@ -81,8 +83,9 @@ function AppShell() {
 
   const handleOpenSettings = React.useCallback(() => {
     closeNotifications()
+    clearToasts()
     openSettings()
-  }, [closeNotifications, openSettings])
+  }, [clearToasts, closeNotifications, openSettings])
 
   const handleLogout = React.useCallback(() => {
     closeNotifications()
@@ -134,13 +137,15 @@ function AppShell() {
     "U"
   ).toUpperCase()
 
+  const sidebarNotificationCount = notificationsOpen ? 0 : notificationCount
+
   return (
     <>
       <AppSidebar
         activeSection={activeSection}
         bellShaking={bellShaking}
         isMobileOpen={false}
-        notificationCount={notificationCount}
+        notificationCount={sidebarNotificationCount}
         onCloseMobile={() => undefined}
         onOpenNotifications={handleOpenNotifications}
         onOpenSettings={handleOpenSettings}
@@ -181,7 +186,7 @@ function AppShell() {
                 type="button"
               >
                 <Bell className="size-5" />
-                <NotificationBadge count={notificationCount} />
+                <NotificationBadge count={sidebarNotificationCount} />
               </button>
 
               <button

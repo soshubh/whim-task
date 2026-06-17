@@ -19,6 +19,7 @@ type ReminderUiContextValue = {
   bellShaking: boolean
   closeNotifications: () => void
   dismissToast: (id: string) => void
+  clearToasts: () => void
   handleReschedule: (reminderId: string) => void
   notificationCount: number
   notifications: NotificationItem[]
@@ -34,11 +35,19 @@ const ReminderUiContext = React.createContext<ReminderUiContextValue | null>(
 
 const TOAST_DURATION_MS = 5000
 
+function getUnreadDueReminderIds(items: NotificationItem[]) {
+  return items
+    .filter((item) => item.isDue || item.status === "triggered")
+    .map((item) => item.reminderId)
+}
+
 export function ReminderUiProvider({ children }: { children: React.ReactNode }) {
   const {
     dismissReminder,
+    isPlannerReady,
     notifications,
     notificationCount,
+    readReminders,
     reminders,
     rescheduleReminder,
     upsertRoutineReminder,
@@ -53,12 +62,13 @@ export function ReminderUiProvider({ children }: { children: React.ReactNode }) 
   const [toastNotifications, setToastNotifications] = React.useState<
     NotificationItem[]
   >([])
-  const hasMountedRef = React.useRef(false)
+  const isTrackingDueRef = React.useRef(false)
   const previousDueIdsRef = React.useRef<Set<string>>(new Set())
 
   const openNotifications = React.useCallback(() => {
+    readReminders(getUnreadDueReminderIds(notifications))
     setNotificationsOpen(true)
-  }, [])
+  }, [notifications, readReminders])
 
   const closeNotifications = React.useCallback(() => {
     setNotificationsOpen(false)
@@ -69,8 +79,21 @@ export function ReminderUiProvider({ children }: { children: React.ReactNode }) 
     setPickerOpen(true)
   }, [])
 
-  const dismissToast = React.useCallback((id: string) => {
-    setToastNotifications((current) => current.filter((item) => item.id !== id))
+  const dismissToast = React.useCallback(
+    (id: string) => {
+      const item = toastNotifications.find((entry) => entry.id === id)
+
+      if (item) {
+        readReminders([item.reminderId])
+      }
+
+      setToastNotifications((current) => current.filter((entry) => entry.id !== id))
+    },
+    [readReminders, toastNotifications],
+  )
+
+  const clearToasts = React.useCallback(() => {
+    setToastNotifications([])
   }, [])
 
   const handleReschedule = React.useCallback(
@@ -138,22 +161,34 @@ export function ReminderUiProvider({ children }: { children: React.ReactNode }) 
   )
 
   React.useEffect(() => {
+    if (!isPlannerReady) {
+      isTrackingDueRef.current = false
+      previousDueIdsRef.current = new Set()
+      return
+    }
+
     const dueItems = notifications.filter(
       (item) => item.isDue || item.status === "triggered",
     )
     const currentDueIds = new Set(dueItems.map((item) => item.id))
 
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true
+    if (!isTrackingDueRef.current) {
+      isTrackingDueRef.current = true
       previousDueIdsRef.current = currentDueIds
       return
     }
 
-    const newDueItems = dueItems.filter(
-      (item) => !previousDueIdsRef.current.has(item.id),
-    )
+    const newDueItems = dueItems.filter((item) => {
+      if (previousDueIdsRef.current.has(item.id)) {
+        return false
+      }
+
+      const reminder = reminders.find((entry) => entry.id === item.reminderId)
+      return !reminder?.readAt
+    })
 
     if (newDueItems.length > 0) {
+      readReminders(newDueItems.map((item) => item.reminderId))
       setBellShaking(true)
       setToastNotifications((current) => {
         const existingIds = new Set(current.map((item) => item.id))
@@ -184,7 +219,13 @@ export function ReminderUiProvider({ children }: { children: React.ReactNode }) 
     }
 
     previousDueIdsRef.current = currentDueIds
-  }, [notifications, settings.notifications])
+  }, [
+    isPlannerReady,
+    notifications,
+    readReminders,
+    reminders,
+    settings.notifications,
+  ])
 
   React.useEffect(() => {
     if (toastNotifications.length === 0) {
@@ -205,6 +246,7 @@ export function ReminderUiProvider({ children }: { children: React.ReactNode }) 
   const value = React.useMemo(
     () => ({
       bellShaking,
+      clearToasts,
       closeNotifications,
       dismissToast,
       handleReschedule,
@@ -217,6 +259,7 @@ export function ReminderUiProvider({ children }: { children: React.ReactNode }) 
     }),
     [
       bellShaking,
+      clearToasts,
       closeNotifications,
       dismissToast,
       handleReschedule,

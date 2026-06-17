@@ -14,6 +14,7 @@ export type TaskReminder = {
   dateKey: string
   id: string
   kind: "task"
+  readAt?: string
   scheduledAt: string
   status: ReminderStatus
   taskId: string
@@ -26,6 +27,7 @@ export type RoutineReminder = {
   id: string
   kind: "routine"
   lastTriggeredDateKey?: string
+  readAt?: string
   routineId: string
   status: ReminderStatus
   time: string
@@ -248,6 +250,7 @@ export function processDueReminders(
       return {
         ...reminder,
         status: "triggered" as const,
+        readAt: undefined,
       }
     }
 
@@ -266,6 +269,7 @@ export function processDueReminders(
       ...reminder,
       status: "triggered" as const,
       lastTriggeredDateKey: dueDateKey ?? reminder.lastTriggeredDateKey,
+      readAt: undefined,
     }
   })
 
@@ -350,8 +354,40 @@ export function countActiveNotifications(
   referenceDate = new Date(),
 ) {
   return buildNotificationFeed(reminders, routines, referenceDate).filter(
-    (item) => item.isDue || item.status === "triggered",
+    (item) => {
+      const reminder = reminders.find((entry) => entry.id === item.reminderId)
+
+      if (reminder?.readAt) {
+        return false
+      }
+
+      return item.isDue || item.status === "triggered"
+    },
   ).length
+}
+
+export function markRemindersRead(
+  reminders: Reminder[],
+  reminderIds: string[],
+  readAt = new Date().toISOString(),
+) {
+  if (reminderIds.length === 0) {
+    return reminders
+  }
+
+  const ids = new Set(reminderIds)
+  let changed = false
+
+  const nextReminders = reminders.map((reminder) => {
+    if (!ids.has(reminder.id) || reminder.readAt) {
+      return reminder
+    }
+
+    changed = true
+    return { ...reminder, readAt }
+  })
+
+  return changed ? nextReminders : reminders
 }
 
 export function findReminderForTask(reminders: Reminder[], taskId: string) {

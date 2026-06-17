@@ -9,6 +9,7 @@ import {
   countActiveNotifications,
   createReminderId,
   loadReminders,
+  markRemindersRead,
   processDueReminders,
   REMINDERS_UPDATED_EVENT,
   saveReminders,
@@ -40,6 +41,7 @@ type PlannerContextValue = {
   notificationCount: number
   notifications: NotificationItem[]
   plannerState: Record<string, PlannerDayState>
+  readReminders: (reminderIds: string[]) => void
   reminders: Reminder[]
   removeRemindersForRoutine: (routineId: string) => void
   removeRemindersForTask: (taskId: string) => void
@@ -362,6 +364,14 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
     )
   }, [])
 
+  const readReminders = React.useCallback((reminderIds: string[]) => {
+    if (reminderIds.length === 0) {
+      return
+    }
+
+    setReminders((current) => markRemindersRead(current, reminderIds))
+  }, [])
+
   const rescheduleReminder = React.useCallback((reminderId: string) => {
     setReminders((current) =>
       current.map((reminder) =>
@@ -369,6 +379,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
           ? {
               ...reminder,
               status: "scheduled" as const,
+              readAt: undefined,
               ...(reminder.kind === "routine"
                 ? { lastTriggeredDateKey: undefined }
                 : {}),
@@ -409,6 +420,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       upsertTaskReminder,
       upsertRoutineReminder,
       dismissReminder,
+      readReminders,
       rescheduleReminder,
       removeRemindersForTask,
       removeRemindersForRoutine,
@@ -424,6 +436,7 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
       upsertTaskReminder,
       upsertRoutineReminder,
       dismissReminder,
+      readReminders,
       rescheduleReminder,
       removeRemindersForTask,
       removeRemindersForRoutine,

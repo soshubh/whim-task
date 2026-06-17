@@ -7,6 +7,7 @@ import {
   playNotificationSound,
   requestBrowserNotificationPermission,
   showBrowserNotification,
+  watchBrowserNotificationPermission,
 } from "@/lib/browser-notifications"
 import {
   buildDailyUpdateMessage,
@@ -41,6 +42,7 @@ type SettingsContextValue = {
   requestBrowserPermission: () => Promise<
     ReturnType<typeof getBrowserNotificationPermission>
   >
+  refreshBrowserPermission: () => void
   settings: AppSettings
   settingsOpen: boolean
 }
@@ -118,6 +120,36 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return permission
   }, [])
 
+  const refreshBrowserPermission = React.useCallback(() => {
+    setBrowserPermission(getBrowserNotificationPermission())
+  }, [])
+
+  React.useEffect(() => {
+    if (!settingsOpen) {
+      return
+    }
+
+    const refreshPermission = () => {
+      setBrowserPermission(getBrowserNotificationPermission())
+    }
+
+    refreshPermission()
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshPermission()
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    const stopWatching = watchBrowserNotificationPermission(refreshPermission)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      stopWatching()
+    }
+  }, [settingsOpen])
+
   React.useEffect(() => {
     const tick = () => {
       const dailySettings = settings.notifications.dailyUpdate
@@ -155,6 +187,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       closeSettings,
       commitSettings,
       openSettings,
+      refreshBrowserPermission,
       requestBrowserPermission,
       settings,
       settingsOpen,
@@ -164,6 +197,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       closeSettings,
       commitSettings,
       openSettings,
+      refreshBrowserPermission,
       requestBrowserPermission,
       settings,
       settingsOpen,
