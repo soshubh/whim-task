@@ -108,18 +108,13 @@ export function TodayTasksPanel({
 
   const handleCompleteTask = (task: PlannerTask) => {
     updateDay(selectedDateKey, (day) => {
-      const nextManualTasks =
-        task.source === "manual"
-          ? day.tasks.filter((entry) => entry.id !== task.id)
-          : day.tasks
-
       if (day.completed.some((entry) => entry.id === task.id)) {
         return day
       }
 
       return {
         ...day,
-        tasks: nextManualTasks,
+        tasks: day.tasks.filter((entry) => entry.id !== task.id),
         completed: [...day.completed, task],
       }
     })
@@ -142,7 +137,10 @@ export function TodayTasksPanel({
 
       return {
         ...day,
-        tasks: [...day.tasks, task],
+        tasks:
+          task.source === "routine"
+            ? day.tasks.filter((entry) => entry.id !== taskId)
+            : [...day.tasks, task],
         completed: day.completed.filter((entry) => entry.id !== taskId),
       }
     })

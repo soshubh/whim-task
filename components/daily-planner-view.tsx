@@ -721,18 +721,13 @@ export function DailyPlannerView() {
 
   const handleTaskComplete = (dateKey: string, task: PlannerTask) => {
     updateDay(dateKey, (day) => {
-      const nextManualTasks =
-        task.source === "manual"
-          ? day.tasks.filter((item) => item.id !== task.id)
-          : day.tasks
-
       if (day.completed.some((item) => item.id === task.id)) {
         return day
       }
 
       return {
         ...day,
-        tasks: nextManualTasks,
+        tasks: day.tasks.filter((item) => item.id !== task.id),
         completed: [...day.completed, task],
       }
     })
@@ -748,7 +743,10 @@ export function DailyPlannerView() {
 
       return {
         ...day,
-        tasks: [...day.tasks, task],
+        tasks:
+          task.source === "routine"
+            ? day.tasks.filter((item) => item.id !== taskId)
+            : [...day.tasks, task],
         completed: day.completed.filter((item) => item.id !== taskId),
       }
     })

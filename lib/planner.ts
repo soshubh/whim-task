@@ -190,9 +190,18 @@ export function getPendingTasksForDay(
       routineId: routine.id,
     }))
 
-  return [...routineTasks, ...dayState.tasks].filter(
-    (task) => !completedIds.has(task.id),
-  )
+  const seen = new Set<string>()
+
+  return [...routineTasks, ...dayState.tasks]
+    .filter((task) => !completedIds.has(task.id))
+    .filter((task) => {
+      if (seen.has(task.id)) {
+        return false
+      }
+
+      seen.add(task.id)
+      return true
+    })
 }
 
 export function getCompletedTasksForDay(
