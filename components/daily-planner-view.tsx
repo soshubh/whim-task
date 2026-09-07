@@ -9,6 +9,8 @@ import {
   CalendarRange,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Info,
   ListTodo,
   MoreHorizontal,
   Plus,
@@ -21,6 +23,11 @@ import { TaskRow, type TaskRowAction } from "./task-row"
 import { usePlanner } from "@/components/planner-provider"
 import { useReminderUi } from "@/components/reminder-ui-provider"
 import { buildReminderPickerTarget } from "@/components/reminder-picker-modal"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { createDraftInputHandlers } from "@/lib/draft-input-handlers"
 import {
   createEmptyTaskDumpState,
@@ -32,6 +39,7 @@ import {
   APP_DATA_SYNCED_EVENT,
   schedulePushAppData,
 } from "@/lib/app-data-sync"
+import { downloadPlannerSheet } from "@/lib/planner-export"
 
 type PlannerTask = {
   id: string
@@ -211,6 +219,16 @@ export function DailyPlannerView() {
   )
   const [activeView, setActiveView] = React.useState<PlannerView>("daily-planner")
   const [isRoutineModalOpen, setIsRoutineModalOpen] = React.useState(false)
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = React.useState(false)
+  const [downloadStartDate, setDownloadStartDate] = React.useState(initialTodayKey)
+  const [downloadEndDate, setDownloadEndDate] = React.useState(initialTodayKey)
+  const [downloadError, setDownloadError] = React.useState<string | null>(null)
+  const [downloadPicker, setDownloadPicker] = React.useState<"start" | "end" | null>(
+    null,
+  )
+  const [downloadPickerMonth, setDownloadPickerMonth] = React.useState(
+    () => new Date(today.getFullYear(), today.getMonth(), 1),
+  )
   const [isMounted, setIsMounted] = React.useState(false)
   const [routineDraft, setRoutineDraft] = React.useState<RoutineDraft>({
     title: "",
@@ -239,6 +257,7 @@ export function DailyPlannerView() {
   const moveMenuRef = React.useRef<HTMLDivElement | null>(null)
   const taskDumpScheduleMenuRef = React.useRef<HTMLDivElement | null>(null)
   const datePickerRef = React.useRef<HTMLDivElement | null>(null)
+  const downloadPickerRef = React.useRef<HTMLDivElement | null>(null)
   const skipDraftBlurRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
@@ -305,6 +324,34 @@ export function DailyPlannerView() {
       document.removeEventListener("keydown", handleKeyDown)
     }
   }, [isCalendarOpen, moveMenu, routineMenu, taskDumpScheduleMenu, taskMenu])
+
+  React.useEffect(() => {
+    if (!downloadPicker) {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (downloadPickerRef.current?.contains(event.target as Node)) {
+        return
+      }
+
+      setDownloadPicker(null)
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDownloadPicker(null)
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [downloadPicker])
 
   const visibleDays = React.useMemo(
     () => DAY_WINDOW.map((offset) => buildVisibleDay(addDays(centerDate, offset))),
@@ -1231,6 +1278,117 @@ export function DailyPlannerView() {
     setIsCalendarOpen(false)
   }
 
+  const openDownloadModal = () => {
+    const endKey = toDateKey(centerDate)
+    const startKey = toDateKey(addDays(centerDate, -6))
+
+    setDownloadStartDate(startKey)
+    setDownloadEndDate(endKey)
+    setDownloadError(null)
+    setDownloadPicker(null)
+    setIsCalendarOpen(false)
+    setIsDownloadModalOpen(true)
+  }
+
+  const closeDownloadModal = () => {
+    setIsDownloadModalOpen(false)
+    setDownloadError(null)
+    setDownloadPicker(null)
+  }
+
+  const openDownloadDatePicker = (picker: "start" | "end") => {
+    const dateKey = picker === "start" ? downloadStartDate : downloadEndDate
+    const [year, month] = dateKey.split("-").map(Number)
+
+    setDownloadPickerMonth(new Date(year, month - 1, 1))
+    setDownloadPicker((current) => (current === picker ? null : picker))
+    setDownloadError(null)
+  }
+
+  const handleDownloadDateSelect = (picker: "start" | "end", date: Date) => {
+    const nextKey = toDateKey(stripTime(date))
+
+    if (picker === "start") {
+      setDownloadStartDate(nextKey)
+      if (nextKey > downloadEndDate) {
+        setDownloadEndDate(nextKey)
+      }
+    } else {
+      setDownloadEndDate(nextKey)
+      if (nextKey < downloadStartDate) {
+        setDownloadStartDate(nextKey)
+      }
+    }
+
+    setDownloadPicker(null)
+    setDownloadError(null)
+  }
+
+  const handleDownloadSheet = () => {
+    if (!downloadStartDate || !downloadEndDate) {
+      setDownloadError("Choose both a start and end date.")
+      return
+    }
+
+    if (downloadStartDate > downloadEndDate) {
+      setDownloadError("Start date must be on or before the end date.")
+      return
+    }
+
+    downloadPlannerSheet(
+      plannerState,
+      routines,
+      downloadStartDate,
+      downloadEndDate,
+    )
+    closeDownloadModal()
+  }
+
+  const renderDownloadDateField = (
+    picker: "start" | "end",
+    label: string,
+    dateKey: string,
+  ) => {
+    const isOpen = downloadPicker === picker
+
+    return (
+      <div className="routine-modal__field download-sheet-modal__date-field">
+        <span className="routine-modal__label">{label}</span>
+        <button
+          aria-expanded={isOpen}
+          aria-label={`${label}: ${formatDownloadDate(dateKey)}. Open calendar`}
+          className={`download-sheet-modal__date-trigger ${
+            isOpen ? "download-sheet-modal__date-trigger--open" : ""
+          }`}
+          onClick={() => openDownloadDatePicker(picker)}
+          type="button"
+        >
+          <span>{formatDownloadDate(dateKey)}</span>
+          <CalendarDays className="size-4" />
+        </button>
+
+        {isOpen
+          ? renderCalendarPopover({
+              className: "download-sheet-modal__calendar",
+              month: downloadPickerMonth,
+              onNextMonth: () =>
+                setDownloadPickerMonth(
+                  (current) =>
+                    new Date(current.getFullYear(), current.getMonth() + 1, 1),
+                ),
+              onPreviousMonth: () =>
+                setDownloadPickerMonth(
+                  (current) =>
+                    new Date(current.getFullYear(), current.getMonth() - 1, 1),
+                ),
+              onSelectDate: (date) => handleDownloadDateSelect(picker, date),
+              selectedDate: fromDateKeyLocal(dateKey),
+            })
+          : null}
+      </div>
+    )
+  }
+
   const renderDailyDateNav = () => (
     <div className="daily-planner__date-nav" ref={datePickerRef}>
       <button
@@ -1273,6 +1431,15 @@ export function DailyPlannerView() {
         type="button"
       >
         <ChevronRight className="size-4" />
+      </button>
+
+      <button
+        aria-label="Download tasks as Google Sheet"
+        className="daily-planner__icon-button"
+        onClick={openDownloadModal}
+        type="button"
+      >
+        <Download className="size-4" />
       </button>
 
       {isCalendarOpen ? (
@@ -1895,6 +2062,92 @@ export function DailyPlannerView() {
         </div>
       ) : null}
 
+      {isMounted && isDownloadModalOpen
+        ? createPortal(
+            <div
+              aria-modal="true"
+              className="routine-modal"
+              onClick={closeDownloadModal}
+              role="dialog"
+            >
+              <div
+                className="routine-modal__panel download-sheet-modal__panel"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="routine-modal__header">
+                  <div className="download-sheet-modal__title-row">
+                    <h3 className="routine-modal__title">Download Google Sheet</h3>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          aria-label="Pick a start and end date. We'll download a CSV you can open directly in Google Sheets."
+                          className="download-sheet-modal__info"
+                          type="button"
+                        >
+                          <Info className="size-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={6}>
+                        Pick a start and end date. We&apos;ll download a CSV you can
+                        open directly in Google Sheets.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <button
+                    aria-label="Close download modal"
+                    className="daily-planner__icon-button"
+                    onClick={closeDownloadModal}
+                    type="button"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+
+                <div className="routine-modal__body">
+                  <div
+                    className="download-sheet-modal__fields"
+                    ref={downloadPickerRef}
+                  >
+                    {renderDownloadDateField(
+                      "start",
+                      "Start date",
+                      downloadStartDate,
+                    )}
+                    {renderDownloadDateField(
+                      "end",
+                      "End date",
+                      downloadEndDate,
+                    )}
+                  </div>
+
+                  {downloadError ? (
+                    <p className="download-sheet-modal__error">{downloadError}</p>
+                  ) : null}
+
+                  <div className="routine-modal__footer">
+                    <button
+                      className="daily-planner__toolbar-button"
+                      onClick={closeDownloadModal}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="daily-planner__toolbar-button download-sheet-modal__submit"
+                      onClick={handleDownloadSheet}
+                      type="button"
+                    >
+                      <Download className="size-4" />
+                      Download sheet
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
       {isMounted && isRoutineModalOpen
         ? createPortal(
             <div
@@ -2215,6 +2468,19 @@ function formatCalendarMonth(date: Date) {
     month: "long",
     year: "numeric",
   }).format(date)
+}
+
+function formatDownloadDate(dateKey: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(fromDateKeyLocal(dateKey))
+}
+
+function fromDateKeyLocal(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number)
+  return new Date(year, month - 1, day)
 }
 
 function formatPlannerCardDate(date: Date) {

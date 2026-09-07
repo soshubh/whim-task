@@ -202,6 +202,7 @@ function ChartTooltipContent({
           .map((item, index) => {
             const key = `${nameKey ?? item.name ?? item.dataKey ?? "value"}`
             const itemConfig = getPayloadConfigFromPayload(config, item, key)
+            const indicatorColor = color ?? item.payload?.fill ?? item.color
 
             return (
               <div
@@ -221,7 +222,7 @@ function ChartTooltipContent({
                       !hideIndicator && (
                         <div
                           className={cn(
-                            "shrink-0 rounded-[2px] border-primary bg-primary",
+                            "shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)",
                             {
                               "h-2.5 w-2.5": indicator === "dot",
                               "w-1": indicator === "line",
@@ -230,6 +231,12 @@ function ChartTooltipContent({
                               "my-0.5": nestLabel && indicator === "dashed",
                             }
                           )}
+                          style={
+                            {
+                              "--color-bg": indicatorColor,
+                              "--color-border": indicatorColor,
+                            } as React.CSSProperties
+                          }
                         />
                       )
                     )}
@@ -306,7 +313,10 @@ function ChartLegendContent({
                 <itemConfig.icon />
               ) : (
                 <div
-                  className="h-2 w-2 shrink-0 rounded-[2px] bg-primary"
+                  className="h-2 w-2 shrink-0 rounded-[2px]"
+                  style={{
+                    backgroundColor: item.color,
+                  }}
                 />
               )}
               {itemConfig?.label}
