@@ -40,6 +40,12 @@ import {
   schedulePushAppData,
 } from "@/lib/app-data-sync"
 import { downloadPlannerSheet } from "@/lib/planner-export"
+import {
+  fetchGoogleCalendarMeetingsForRange,
+  GOOGLE_CALENDAR_UPDATED_EVENT,
+  loadGoogleCalendarConnection,
+  type GoogleCalendarMeeting,
+} from "@/lib/google-calendar"
 
 type PlannerTask = {
   id: string
@@ -229,6 +235,12 @@ export function DailyPlannerView() {
   const [downloadPickerMonth, setDownloadPickerMonth] = React.useState(
     () => new Date(today.getFullYear(), today.getMonth(), 1),
   )
+  const [googleMeetings, setGoogleMeetings] = React.useState<
+    GoogleCalendarMeeting[]
+  >([])
+  const [googleCalendarConnected, setGoogleCalendarConnected] = React.useState(
+    () => loadGoogleCalendarConnection().connected,
+  )
   const [isMounted, setIsMounted] = React.useState(false)
   const [routineDraft, setRoutineDraft] = React.useState<RoutineDraft>({
     title: "",
@@ -358,6 +370,55 @@ export function DailyPlannerView() {
     [centerDate]
   )
   const weekDays = React.useMemo(() => buildCurrentWeek(centerDate), [centerDate])
+
+  React.useEffect(() => {
+    const syncConnection = () => {
+      setGoogleCalendarConnected(loadGoogleCalendarConnection().connected)
+    }
+
+    window.addEventListener(GOOGLE_CALENDAR_UPDATED_EVENT, syncConnection)
+    return () => {
+      window.removeEventListener(GOOGLE_CALENDAR_UPDATED_EVENT, syncConnection)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (activeView !== "daily-planner" || !googleCalendarConnected) {
+      setGoogleMeetings([])
+      return
+    }
+
+    const startDateKey = toDateKey(addDays(centerDate, DAY_WINDOW[0]))
+    const endDateKey = toDateKey(addDays(centerDate, DAY_WINDOW[DAY_WINDOW.length - 1]))
+    let cancelled = false
+
+    void fetchGoogleCalendarMeetingsForRange(startDateKey, endDateKey).then(
+      (result) => {
+        if (cancelled) {
+          return
+        }
+
+        setGoogleCalendarConnected(result.connected)
+        setGoogleMeetings(result.meetings)
+      },
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeView, centerDate, googleCalendarConnected])
+
+  const meetingsByDate = React.useMemo(() => {
+    const grouped = new Map<string, GoogleCalendarMeeting[]>()
+
+    for (const meeting of googleMeetings) {
+      const current = grouped.get(meeting.dateKey) ?? []
+      current.push(meeting)
+      grouped.set(meeting.dateKey, current)
+    }
+
+    return grouped
+  }, [googleMeetings])
 
   const resetRoutineDraft = React.useCallback(() => {
     setRoutineDraft({
@@ -1519,6 +1580,7 @@ export function DailyPlannerView() {
               const visibleTasks = [...routineTasks, ...dayState.tasks].filter(
                 (task) => !completedIds.has(task.id)
               )
+              const dayMeetings = meetingsByDate.get(day.key) ?? []
 
               return (
                 <section
@@ -1543,6 +1605,38 @@ export function DailyPlannerView() {
                   </header>
 
                   <div className="daily-planner__day-body">
+                    {dayMeetings.length > 0 ? (
+                      <div
+                        aria-label="Google Calendar meetings"
+                        className="daily-planner__meeting-list"
+                      >
+                        {dayMeetings.map((meeting) => (
+                          <a
+                            className="daily-planner__meeting-row"
+                            href={meeting.htmlLink ?? undefined}
+                            key={meeting.id}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            <span className="daily-planner__meeting-icon" aria-hidden>
+                              <CalendarDays className="size-4" />
+                            </span>
+                            <span className="daily-planner__meeting-copy">
+                              <span className="daily-planner__meeting-time">
+                                {meeting.startLabel}
+                              </span>
+                              <span className="daily-planner__meeting-title">
+                                {meeting.title}
+                              </span>
+                            </span>
+                            <span className="daily-planner__meeting-badge">
+                              Meeting
+                            </span>
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+
                     {visibleTasks.length > 0 ? (
                       <div className="daily-planner__task-list">
                         {visibleTasks.map((task) => (
@@ -1640,6 +1734,7 @@ export function DailyPlannerView() {
                       <button
                         className={`daily-planner__add-task ${
                           visibleTasks.length === 0 &&
+                          dayMeetings.length === 0 &&
                           dayState.completed.length === 0
                             ? "daily-planner__add-task--empty"
                             : ""

@@ -156,3 +156,47 @@ export function consumeGoogleCalendarCallbackParams() {
     message,
   }
 }
+
+export type GoogleCalendarMeeting = {
+  allDay: boolean
+  dateKey: string
+  end: string | null
+  htmlLink: string | null
+  id: string
+  start: string | null
+  startLabel: string
+  title: string
+}
+
+export async function fetchGoogleCalendarMeetingsForRange(
+  startDateKey: string,
+  endDateKey: string,
+): Promise<{
+  connected: boolean
+  meetings: GoogleCalendarMeeting[]
+}> {
+  const params = new URLSearchParams({
+    start: startDateKey,
+    end: endDateKey,
+  })
+
+  const response = await fetch(`/api/google/events?${params.toString()}`, {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    return { connected: false, meetings: [] }
+  }
+
+  const data = (await response.json()) as {
+    connected?: boolean
+    meetings?: GoogleCalendarMeeting[]
+  }
+
+  return {
+    connected: Boolean(data.connected),
+    meetings: data.meetings ?? [],
+  }
+}
