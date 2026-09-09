@@ -25,6 +25,10 @@ import {
 } from "@/components/settings-provider"
 import { GET_STARTED_PATH } from "@/lib/app-meta"
 import {
+  consumeGoogleCalendarCallbackParams,
+  fetchGoogleCalendarStatus,
+} from "@/lib/google-calendar"
+import {
   readShellSectionFromLocation,
   writeShellSectionToLocation,
 } from "@/lib/shell-navigation"
@@ -99,6 +103,35 @@ function AppShell() {
     setActiveSection(section)
     writeShellSectionToLocation(section)
   }, [])
+
+  React.useEffect(() => {
+    if (isLoading || !isAuthenticated) {
+      return
+    }
+
+    const callback = consumeGoogleCalendarCallbackParams()
+    if (!callback) {
+      return
+    }
+
+    if (callback.status === "connected") {
+      window.sessionStorage.setItem(
+        "whim-google-calendar-hint",
+        "Google Calendar connected. Meetings can sync from this account.",
+      )
+    } else {
+      window.sessionStorage.setItem(
+        "whim-google-calendar-hint",
+        callback.message
+          ? `Could not connect Google Calendar (${callback.message}).`
+          : "Could not connect Google Calendar.",
+      )
+    }
+
+    void fetchGoogleCalendarStatus().finally(() => {
+      openSettings()
+    })
+  }, [isAuthenticated, isLoading, openSettings])
 
   React.useEffect(() => {
     if (isLoading) {

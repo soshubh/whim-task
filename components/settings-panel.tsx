@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Camera, Check, Volume2 } from "lucide-react"
+import { Camera, Check, CalendarDays, Volume2 } from "lucide-react"
 
 import { ContentDrawer } from "@/components/content-drawer"
 import { useSettings } from "@/components/settings-provider"
@@ -11,6 +11,15 @@ import {
   promptBrowserNotificationPermission,
 } from "@/lib/browser-notifications"
 import { APP_NAME, APP_VERSION } from "@/lib/app-meta"
+import {
+  disconnectGoogleCalendarRemote,
+  fetchGoogleCalendarStatus,
+  isGoogleOAuthConfigured,
+  loadGoogleCalendarConnection,
+  startGoogleCalendarConnect,
+  type GoogleCalendarConnection,
+  GOOGLE_CALENDAR_UPDATED_EVENT,
+} from "@/lib/google-calendar"
 import {
   areSettingsEqual,
   type AppSettings,
@@ -53,6 +62,14 @@ export function SettingsPanel({ onClose, onLogout, open }: SettingsPanelProps) {
     null,
   )
   const [isCheckingPermission, setIsCheckingPermission] = React.useState(false)
+  const [googleCalendar, setGoogleCalendar] =
+    React.useState<GoogleCalendarConnection>(() =>
+      loadGoogleCalendarConnection(),
+    )
+  const [googleCalendarHint, setGoogleCalendarHint] = React.useState<
+    string | null
+  >(null)
+  const [isGoogleCalendarBusy, setIsGoogleCalendarBusy] = React.useState(false)
 
   React.useEffect(() => {
     if (open) {
@@ -60,8 +77,65 @@ export function SettingsPanel({ onClose, onLogout, open }: SettingsPanelProps) {
       pendingAvatarFileRef.current = null
       setSaveError(null)
       setNotificationHint(null)
+      setGoogleCalendar(loadGoogleCalendarConnection())
+      const storedHint = window.sessionStorage.getItem(
+        "whim-google-calendar-hint",
+      )
+      if (storedHint) {
+        setGoogleCalendarHint(storedHint)
+        window.sessionStorage.removeItem("whim-google-calendar-hint")
+      } else {
+        setGoogleCalendarHint(null)
+      }
     }
   }, [open, settings])
+
+  React.useEffect(() => {
+    const handleUpdated = () => {
+      setGoogleCalendar(loadGoogleCalendarConnection())
+    }
+
+    window.addEventListener(GOOGLE_CALENDAR_UPDATED_EVENT, handleUpdated)
+    return () => {
+      window.removeEventListener(GOOGLE_CALENDAR_UPDATED_EVENT, handleUpdated)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    void fetchGoogleCalendarStatus().then((connection) => {
+      setGoogleCalendar(connection)
+    })
+  }, [open])
+
+  const handleConnectGoogleCalendar = () => {
+    if (!isGoogleOAuthConfigured()) {
+      setGoogleCalendarHint(
+        "Add Google OAuth keys in .env.local, then restart the app.",
+      )
+      return
+    }
+
+    setIsGoogleCalendarBusy(true)
+    setGoogleCalendarHint("Redirecting to Google…")
+    startGoogleCalendarConnect()
+  }
+
+  const handleDisconnectGoogleCalendar = async () => {
+    setIsGoogleCalendarBusy(true)
+    setGoogleCalendarHint(null)
+
+    try {
+      const connection = await disconnectGoogleCalendarRemote()
+      setGoogleCalendar(connection)
+      setGoogleCalendarHint("Google Calendar disconnected.")
+    } finally {
+      setIsGoogleCalendarBusy(false)
+    }
+  }
 
   const hasChanges = !areSettingsEqual(draft, settings)
   const profile = draft.profile
@@ -433,6 +507,63 @@ export function SettingsPanel({ onClose, onLogout, open }: SettingsPanelProps) {
                 }
               />
             </>
+          ) : null}
+        </SettingsGroup>
+      </section>
+
+      <section className="content-drawer__section content-drawer__section--compact">
+        <h3 className="content-drawer__section-title">Integrations</h3>
+
+        <SettingsGroup compact>
+          <SettingsItem>
+            <div className="content-drawer__integration">
+              <div className="content-drawer__integration-header">
+                <div className="content-drawer__integration-title-row">
+                  <CalendarDays className="size-4" />
+                  <strong className="content-drawer__integration-title">
+                    Google Calendar
+                  </strong>
+                </div>
+
+                {googleCalendar.connected ? (
+                  <button
+                    className="content-drawer__integration-button content-drawer__integration-button--connected"
+                    disabled={isGoogleCalendarBusy}
+                    onClick={() => void handleDisconnectGoogleCalendar()}
+                    type="button"
+                  >
+                    {isGoogleCalendarBusy ? "Disconnecting..." : "Connected"}
+                  </button>
+                ) : (
+                  <button
+                    className="content-drawer__integration-button"
+                    disabled={isGoogleCalendarBusy}
+                    onClick={handleConnectGoogleCalendar}
+                    type="button"
+                  >
+                    {isGoogleCalendarBusy ? "Connecting..." : "Connect"}
+                  </button>
+                )}
+              </div>
+
+              <p className="content-drawer__settings-hint content-drawer__integration-description">
+                Sync meetings from your Gmail calendar into Daily Planner.
+              </p>
+
+              {googleCalendar.connected && googleCalendar.email ? (
+                <p className="content-drawer__integration-status">
+                  {googleCalendar.email}
+                </p>
+              ) : null}
+            </div>
+          </SettingsItem>
+
+          {googleCalendarHint ? (
+            <SettingsItem>
+              <p className="content-drawer__settings-hint" role="status">
+                {googleCalendarHint}
+              </p>
+            </SettingsItem>
           ) : null}
         </SettingsGroup>
       </section>
