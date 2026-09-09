@@ -39,13 +39,16 @@ import {
   APP_DATA_SYNCED_EVENT,
   schedulePushAppData,
 } from "@/lib/app-data-sync"
-import { downloadPlannerSheet } from "@/lib/planner-export"
 import {
   fetchGoogleCalendarMeetingsForRange,
+  getGoogleMeetingDateKey,
   GOOGLE_CALENDAR_UPDATED_EVENT,
   loadGoogleCalendarConnection,
+  toGoogleMeetingTaskId,
   type GoogleCalendarMeeting,
 } from "@/lib/google-calendar"
+import { downloadPlannerSheet } from "@/lib/planner-export"
+import { GoogleMeetingRow } from "@/components/google-meeting-row"
 
 type PlannerTask = {
   id: string
@@ -412,13 +415,54 @@ export function DailyPlannerView() {
     const grouped = new Map<string, GoogleCalendarMeeting[]>()
 
     for (const meeting of googleMeetings) {
-      const current = grouped.get(meeting.dateKey) ?? []
+      const dateKey = getGoogleMeetingDateKey(meeting)
+      const dayState = plannerState[dateKey]
+      const meetingTaskId = toGoogleMeetingTaskId(meeting.id)
+      const alreadyTracked = Boolean(
+        dayState?.completed.some((task) => task.id === meetingTaskId) ||
+          dayState?.tasks.some((task) => task.id === meetingTaskId),
+      )
+
+      if (alreadyTracked) {
+        continue
+      }
+
+      const current = grouped.get(dateKey) ?? []
       current.push(meeting)
-      grouped.set(meeting.dateKey, current)
+      grouped.set(dateKey, current)
     }
 
     return grouped
-  }, [googleMeetings])
+  }, [googleMeetings, plannerState])
+
+  const completeGoogleMeeting = React.useCallback(
+    (dateKey: string, meeting: GoogleCalendarMeeting) => {
+      const meetingTaskId = toGoogleMeetingTaskId(meeting.id)
+
+      updateDay(dateKey, (day) => {
+        if (
+          day.completed.some((task) => task.id === meetingTaskId) ||
+          day.tasks.some((task) => task.id === meetingTaskId)
+        ) {
+          return day
+        }
+
+        return {
+          ...day,
+          completed: [
+            ...day.completed,
+            {
+              id: meetingTaskId,
+              title: meeting.title,
+              source: "manual" as const,
+            },
+          ],
+          showCompleted: true,
+        }
+      })
+    },
+    [updateDay],
+  )
 
   const resetRoutineDraft = React.useCallback(() => {
     setRoutineDraft({
@@ -1611,28 +1655,13 @@ export function DailyPlannerView() {
                         className="daily-planner__meeting-list"
                       >
                         {dayMeetings.map((meeting) => (
-                          <a
-                            className="daily-planner__meeting-row"
-                            href={meeting.htmlLink ?? undefined}
+                          <GoogleMeetingRow
                             key={meeting.id}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            <span className="daily-planner__meeting-icon" aria-hidden>
-                              <CalendarDays className="size-4" />
-                            </span>
-                            <span className="daily-planner__meeting-copy">
-                              <span className="daily-planner__meeting-time">
-                                {meeting.startLabel}
-                              </span>
-                              <span className="daily-planner__meeting-title">
-                                {meeting.title}
-                              </span>
-                            </span>
-                            <span className="daily-planner__meeting-badge">
-                              Meeting
-                            </span>
-                          </a>
+                            meeting={meeting}
+                            onComplete={() =>
+                              completeGoogleMeeting(day.key, meeting)
+                            }
+                          />
                         ))}
                       </div>
                     ) : null}

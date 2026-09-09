@@ -168,6 +168,52 @@ export type GoogleCalendarMeeting = {
   title: string
 }
 
+export function toGoogleMeetingTaskId(meetingId: string) {
+  return `gcal-${meetingId}`
+}
+
+export function isGoogleMeetingTaskId(taskId: string) {
+  return taskId.startsWith("gcal-")
+}
+
+export function getGoogleMeetingDateKey(meeting: GoogleCalendarMeeting) {
+  if (meeting.allDay && meeting.start) {
+    return meeting.start.slice(0, 10)
+  }
+
+  if (meeting.start) {
+    const date = new Date(meeting.start)
+    if (!Number.isNaN(date.getTime())) {
+      const year = date.getFullYear()
+      const month = `${date.getMonth() + 1}`.padStart(2, "0")
+      const day = `${date.getDate()}`.padStart(2, "0")
+      return `${year}-${month}-${day}`
+    }
+  }
+
+  return meeting.dateKey
+}
+
+export function formatGoogleMeetingTimeLabel(meeting: GoogleCalendarMeeting) {
+  if (meeting.allDay) {
+    return "All day"
+  }
+
+  if (!meeting.start) {
+    return meeting.startLabel || "Meeting"
+  }
+
+  const date = new Date(meeting.start)
+  if (Number.isNaN(date.getTime())) {
+    return meeting.startLabel || "Meeting"
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date)
+}
+
 export async function fetchGoogleCalendarMeetingsForRange(
   startDateKey: string,
   endDateKey: string,

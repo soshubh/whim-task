@@ -7,6 +7,13 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { usePlanner } from "@/components/planner-provider";
 import { TodayTasksPanel } from "@/components/today-tasks-panel";
 import {
+  fetchGoogleCalendarMeetingsForRange,
+  getGoogleMeetingDateKey,
+  GOOGLE_CALENDAR_UPDATED_EVENT,
+  loadGoogleCalendarConnection,
+  toGoogleMeetingTaskId,
+} from "@/lib/google-calendar";
+import {
   formatPomodoroDuration,
   formatPomodoroSessionDuration,
   getTotalFocusSeconds,
@@ -275,6 +282,12 @@ export function HomeDashboard() {
     () => new Date(today.getFullYear(), today.getMonth(), 1),
   );
   const [calendarExpanded, setCalendarExpanded] = React.useState(false);
+  const [googleCalendarConnected, setGoogleCalendarConnected] = React.useState(
+    () => loadGoogleCalendarConnection().connected,
+  );
+  const [googleMeetings, setGoogleMeetings] = React.useState<
+    import("@/lib/google-calendar").GoogleCalendarMeeting[]
+  >([]);
   const [focusSessions, setFocusSessions] = React.useState(0);
   const [pomodoroLogs, setPomodoroLogs] = React.useState<PomodoroSessionLog[]>(
     [],
@@ -298,6 +311,65 @@ export function HomeDashboard() {
     () => buildCalendarDays(calendarMonth),
     [calendarMonth],
   );
+
+  React.useEffect(() => {
+    const syncConnection = () => {
+      setGoogleCalendarConnected(loadGoogleCalendarConnection().connected);
+    };
+
+    window.addEventListener(GOOGLE_CALENDAR_UPDATED_EVENT, syncConnection);
+    return () => {
+      window.removeEventListener(GOOGLE_CALENDAR_UPDATED_EVENT, syncConnection);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!googleCalendarConnected || calendarDays.length === 0) {
+      setGoogleMeetings([]);
+      return;
+    }
+
+    const startDateKey = toDateKey(calendarDays[0].date);
+    const endDateKey = toDateKey(calendarDays[calendarDays.length - 1].date);
+    let cancelled = false;
+
+    void fetchGoogleCalendarMeetingsForRange(startDateKey, endDateKey).then(
+      (result) => {
+        if (cancelled) {
+          return;
+        }
+
+        setGoogleCalendarConnected(result.connected);
+        setGoogleMeetings(result.meetings);
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [calendarDays, googleCalendarConnected]);
+
+  const meetingCountsByDate = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+
+    for (const meeting of googleMeetings) {
+      const dateKey = getGoogleMeetingDateKey(meeting);
+      const meetingTaskId = toGoogleMeetingTaskId(meeting.id);
+      const day = plannerState[dateKey];
+      const alreadyTracked = Boolean(
+        day?.completed.some((task) => task.id === meetingTaskId) ||
+          day?.tasks.some((task) => task.id === meetingTaskId),
+      );
+
+      if (alreadyTracked) {
+        continue;
+      }
+
+      counts[dateKey] = (counts[dateKey] ?? 0) + 1;
+    }
+
+    return counts;
+  }, [googleMeetings, plannerState]);
 
   const dayState = plannerState[selectedDateKey] ?? {
     tasks: [],
@@ -523,6 +595,7 @@ export function HomeDashboard() {
         const isCurrentMonth =
           day.date.getMonth() === calendarMonth.getMonth();
         const routineCount = countRoutinesForDay(routines, day.date);
+        const meetingCount = meetingCountsByDate[dayKey] ?? 0;
         const isCompleted = isDayFullyCompleted(
           plannerState,
           routines,
@@ -544,6 +617,7 @@ export function HomeDashboard() {
               isTodayDay ? "daily-planner__calendar-day--today" : "",
               isSelected ? "daily-planner__calendar-day--selected" : "",
               isCompleted ? "home-dashboard__calendar-day--completed" : "",
+              meetingCount > 0 ? "home-dashboard__calendar-day--has-meeting" : "",
             ]
               .filter(Boolean)
               .join(" ")}
@@ -554,15 +628,30 @@ export function HomeDashboard() {
             <span className="home-dashboard__calendar-day-number">
               {day.date.getDate()}
             </span>
-            {routineCount > 0 ? (
+            {routineCount > 0 || meetingCount > 0 ? (
               <span
-                aria-label={`${routineCount} routine${
-                  routineCount === 1 ? "" : "s"
-                }`}
+                aria-label={[
+                  routineCount > 0
+                    ? `${routineCount} routine${routineCount === 1 ? "" : "s"}`
+                    : null,
+                  meetingCount > 0
+                    ? `${meetingCount} meeting${meetingCount === 1 ? "" : "s"}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
                 className="home-dashboard__calendar-routines"
               >
                 {Array.from({
-                  length: Math.min(routineCount, 4),
+                  length: Math.min(meetingCount, 2),
+                }).map((_, index) => (
+                  <span
+                    className="home-dashboard__calendar-meeting-dot"
+                    key={`${dayKey}-meeting-${index}`}
+                  />
+                ))}
+                {Array.from({
+                  length: Math.min(routineCount, Math.max(0, 4 - Math.min(meetingCount, 2))),
                 }).map((_, index) => (
                   <span
                     className="home-dashboard__calendar-routine-dot"

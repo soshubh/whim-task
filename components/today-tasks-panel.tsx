@@ -6,7 +6,16 @@ import { PencilLine, Plus, Trash2, Bell } from "lucide-react"
 import { usePlanner } from "@/components/planner-provider"
 import { buildReminderPickerTarget } from "@/components/reminder-picker-modal"
 import { useReminderUi } from "@/components/reminder-ui-provider"
+import { GoogleMeetingRow } from "@/components/google-meeting-row"
 import { TaskRow, type TaskRowAction } from "@/components/task-row"
+import {
+  fetchGoogleCalendarMeetingsForRange,
+  getGoogleMeetingDateKey,
+  GOOGLE_CALENDAR_UPDATED_EVENT,
+  loadGoogleCalendarConnection,
+  toGoogleMeetingTaskId,
+  type GoogleCalendarMeeting,
+} from "@/lib/google-calendar"
 import {
   createTask,
   getPendingTasksForDay,
@@ -50,6 +59,12 @@ export function TodayTasksPanel({
   const [editingTask, setEditingTask] = React.useState<EditingTaskState | null>(
     null,
   )
+  const [googleMeetings, setGoogleMeetings] = React.useState<
+    GoogleCalendarMeeting[]
+  >([])
+  const [googleCalendarConnected, setGoogleCalendarConnected] = React.useState(
+    () => loadGoogleCalendarConnection().connected,
+  )
   const skipDraftBlurRef = React.useRef<string | null>(null)
 
   const dayState =
@@ -65,6 +80,85 @@ export function TodayTasksPanel({
     () => getPendingTasksForDay(plannerState, routines, selectedDate),
     [plannerState, routines, selectedDate, selectedDateKey],
   )
+
+  const visibleMeetings = React.useMemo(() => {
+    return googleMeetings.filter((meeting) => {
+      const meetingTaskId = toGoogleMeetingTaskId(meeting.id)
+      return !(
+        dayState.completed.some((task) => task.id === meetingTaskId) ||
+        dayState.tasks.some((task) => task.id === meetingTaskId)
+      )
+    })
+  }, [dayState.completed, dayState.tasks, googleMeetings])
+
+  const completeGoogleMeeting = React.useCallback(
+    (meeting: GoogleCalendarMeeting) => {
+      const meetingTaskId = toGoogleMeetingTaskId(meeting.id)
+
+      updateDay(selectedDateKey, (day) => {
+        if (
+          day.completed.some((task) => task.id === meetingTaskId) ||
+          day.tasks.some((task) => task.id === meetingTaskId)
+        ) {
+          return day
+        }
+
+        return {
+          ...day,
+          completed: [
+            ...day.completed,
+            {
+              id: meetingTaskId,
+              title: meeting.title,
+              source: "manual" as const,
+            },
+          ],
+          showCompleted: true,
+        }
+      })
+    },
+    [selectedDateKey, updateDay],
+  )
+
+  React.useEffect(() => {
+    const syncConnection = () => {
+      setGoogleCalendarConnected(loadGoogleCalendarConnection().connected)
+    }
+
+    window.addEventListener(GOOGLE_CALENDAR_UPDATED_EVENT, syncConnection)
+    return () => {
+      window.removeEventListener(GOOGLE_CALENDAR_UPDATED_EVENT, syncConnection)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (!googleCalendarConnected) {
+      setGoogleMeetings([])
+      return
+    }
+
+    let cancelled = false
+
+    void fetchGoogleCalendarMeetingsForRange(
+      selectedDateKey,
+      selectedDateKey,
+    ).then((result) => {
+      if (cancelled) {
+        return
+      }
+
+      setGoogleCalendarConnected(result.connected)
+      setGoogleMeetings(
+        result.meetings.filter(
+          (meeting) => getGoogleMeetingDateKey(meeting) === selectedDateKey,
+        ),
+      )
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [googleCalendarConnected, selectedDateKey])
 
   const handleAddTask = () => {
     updateDay(selectedDateKey, (day) => ({
@@ -318,6 +412,21 @@ export function TodayTasksPanel({
       ) : null}
 
       <div className="daily-planner__day-body">
+        {visibleMeetings.length > 0 ? (
+          <div
+            aria-label="Google Calendar meetings"
+            className="daily-planner__meeting-list"
+          >
+            {visibleMeetings.map((meeting) => (
+              <GoogleMeetingRow
+                key={meeting.id}
+                meeting={meeting}
+                onComplete={() => completeGoogleMeeting(meeting)}
+              />
+            ))}
+          </div>
+        ) : null}
+
         {pendingTasks.length > 0 ? (
           <div className="daily-planner__task-list">
             {pendingTasks.map((task) => (
@@ -359,7 +468,9 @@ export function TodayTasksPanel({
         ) : (
           <button
             className={`daily-planner__add-task ${
-              pendingTasks.length === 0 && dayState.completed.length === 0
+              pendingTasks.length === 0 &&
+              visibleMeetings.length === 0 &&
+              dayState.completed.length === 0
                 ? "daily-planner__add-task--empty"
                 : ""
             }`}
